@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Theme Variables ── */
+:root, [data-theme="royal-navy"] {
+  --bg-gradient: linear-gradient(180deg, #040C1E 0%, #070E21 100%);
+  --sidebar-bg: linear-gradient(180deg, #040C1E 0%, #070E21 100%);
+  --card-bg: rgba(19, 32, 64, 0.7);
+  --accent-gold: #C9A84C;
+  --accent-gold-light: #E8D48B;
+  --border-gold: rgba(201, 168, 76, 0.12);
+  --hover-bg: rgba(36, 53, 96, 0.6);
+}
+
+[data-theme="celestial-purple"] {
+  --bg-gradient: linear-gradient(180deg, #0B051B 0%, #12092B 100%);
+  --sidebar-bg: linear-gradient(180deg, #090317 0%, #12092B 100%);
+  --card-bg: rgba(33, 19, 68, 0.7);
+  --accent-gold: #F3C64F;
+  --accent-gold-light: #FCE698;
+  --border-gold: rgba(243, 198, 79, 0.15);
+  --hover-bg: rgba(56, 33, 108, 0.6);
+}
+
+[data-theme="emerald-sanctuary"] {
+  --bg-gradient: linear-gradient(180deg, #02120D 0%, #041A14 100%);
+  --sidebar-bg: linear-gradient(180deg, #010E09 0%, #041A14 100%);
+  --card-bg: rgba(12, 44, 35, 0.7);
+  --accent-gold: #E5C158;
+  --accent-gold-light: #F7E398;
+  --border-gold: rgba(229, 193, 88, 0.15);
+  --hover-bg: rgba(22, 68, 55, 0.6);
+}
+
+/* ── Base resets ── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-gradient);
+  min-height: 100vh;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #070E21; }
+::-webkit-scrollbar-thumb { background: #243560; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #C9A84C; }
+
+/* ── Focus ring ── */
+:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; border-radius: 4px; }
+
+/* ── Gold text gradient ── */
+.text-gold-gradient {
+  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-light) 50%, var(--accent-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glassmorphism card ── */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-gold);
+  border-radius: 16px;
+}
+
+/* ── Gold shimmer loader ── */
+.shimmer {
+  background: linear-gradient(90deg, #1A2B50 25%, #243560 50%, #1A2B50 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Stat card hover glow ── */
+.stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(201, 168, 76, 0.15);
+}
+
+/* ── Nav active state ── */
+.nav-active {
+  background: linear-gradient(90deg, rgba(201,168,76,0.18) 0%, rgba(201,168,76,0.06) 100%);
+  border-left: 3px solid var(--accent-gold);
+  color: var(--accent-gold-light);
+}
+
+/* ── Table row hover ── */
+.table-row-hover {
+  transition: background 0.15s ease;
+}
+.table-row-hover:hover {
+  background: var(--hover-bg);
+}
+
+/* ── Pill badges ── */
+.pill-open   { background: rgba(34,197,94,0.12);  color: #86efac; border: 1px solid rgba(34,197,94,0.25); }
+.pill-closed { background: rgba(148,163,184,0.12); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); }
+.pill-pending { background: rgba(234,179,8,0.12);  color: #fde047; border: 1px solid rgba(234,179,8,0.25); }
+.pill-answered { background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.25); }
+
+/* ── Message bubbles ── */
+.bubble-member {
+  background: var(--hover-bg);
+  border-radius: 18px 18px 18px 4px;
+}
+.bubble-assistant {
+  background: linear-gradient(135deg, rgba(201,168,76,0.2) 0%, rgba(201,168,76,0.12) 100%);
+  border: 1px solid var(--border-gold);
+  border-radius: 18px 18px 4px 18px;
+}
+
+/* ── Animations ── */
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp  { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer  { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes pulse-gold { 0%,100% { box-shadow: 0 0 0 0 rgba(201,168,76,0.4); } 50% { box-shadow: 0 0 0 8px rgba(201,168,76,0); } }
+
+.animate-fade-in  { animation: fadeIn 0.4s ease-out; }
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+.animate-pulse-gold { animation: pulse-gold 2s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
