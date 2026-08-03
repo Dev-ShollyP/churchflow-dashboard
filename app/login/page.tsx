@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 export default function LoginPage() {
@@ -12,8 +11,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   const setAuthSessionCookie = (userEmail: string) => {
-    document.cookie = `churchflow_staff_session=true; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-    document.cookie = `churchflow_staff_email=${encodeURIComponent(userEmail)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+    document.cookie = `churchflow_staff_session=true; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    document.cookie = `churchflow_staff_email=${encodeURIComponent(userEmail)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -21,25 +20,31 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters long.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const res = await fetch('/api/staff/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      });
 
-      if (authError) {
-        // Attempt sign up if user does not exist yet in Supabase auth
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-        });
+      const data = await res.json();
 
-        if (signUpError) {
-          setError(authError.message);
-          setLoading(false);
-          return;
-        }
+      if (!res.ok || data.error) {
+        setError(data.error || 'Invalid login credentials. Please check your email and password.');
+        setLoading(false);
+        return;
       }
 
-      setAuthSessionCookie(email);
+      // Success: Set session cookies & redirect to Dashboard
+      setAuthSessionCookie(cleanEmail);
       window.location.href = '/';
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during login.');
@@ -81,7 +86,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                placeholder="everflourishingarea@gmail.com"
+                placeholder="eccentricayo@gmail.com"
                 className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/20 bg-navy-dark/60 border border-white/10 focus:border-gold/50 focus:outline-none transition-colors"
               />
             </div>
@@ -111,7 +116,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/25 text-red-400 text-xs">
+              <div className="px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-xs">
                 {error}
               </div>
             )}
