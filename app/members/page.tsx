@@ -45,27 +45,33 @@ export default function MembersPage() {
     fetchMembers();
   }, []);
 
-  // Update Status in Supabase DB
+  // Update Status via API Route for 100% reliability on Vercel
   const handleStatusChange = async (memberId: string, newStatus: string) => {
     setUpdatingId(memberId);
     setToast(null);
-    const supabase = createClient();
 
-    const { error } = await supabase
-      .from('members')
-      .update({ membership_status: newStatus })
-      .eq('id', memberId);
+    try {
+      const res = await fetch('/api/members/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId, status: newStatus }),
+      });
 
-    if (error) {
-      setToast({ type: 'error', text: `Failed to update status: ${error.message}` });
-    } else {
-      setToast({ type: 'success', text: `Member status updated to "${newStatus}"` });
-      // Optimistic local update
-      setMembers(prev =>
-        prev.map(m => m.id === memberId ? { ...m, membership_status: newStatus } : m)
-      );
+      const resData = await res.json();
+
+      if (!res.ok || resData.error) {
+        setToast({ type: 'error', text: `Failed to update status: ${resData.error || 'Server error'}` });
+      } else {
+        setToast({ type: 'success', text: `Member status updated to "${newStatus}"` });
+        setMembers(prev =>
+          prev.map(m => m.id === memberId ? { ...m, membership_status: newStatus } : m)
+        );
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', text: err.message || 'Failed to update member status.' });
+    } finally {
+      setUpdatingId(null);
     }
-    setUpdatingId(null);
   };
 
   // Filtered members list based on search and status filter
@@ -76,13 +82,13 @@ export default function MembersPage() {
 
     const status = (member.membership_status || 'visitor').toLowerCase();
     const matchesStatus =
-      selectedStatus === 'all' ? true : status === selectedStatus;
+      selectedStatus === 'all' ? true : status.includes(selectedStatus);
 
     return matchesSearch && matchesStatus;
   });
 
-  const activeCount = members.filter(m => (m.membership_status || '').toLowerCase() === 'active').length;
-  const visitorCount = members.filter(m => !(m.membership_status || '').toLowerCase().includes('active')).length;
+  const activeCount = members.filter(m => ['active', 'member'].includes((m.membership_status || '').toLowerCase())).length;
+  const visitorCount = members.filter(m => !['active', 'member'].includes((m.membership_status || '').toLowerCase())).length;
 
   return (
     <DashboardShell>
@@ -173,6 +179,7 @@ export default function MembersPage() {
                 {filteredMembers.map((member: Member, idx: number) => {
                   const currentSt = (member.membership_status || 'visitor').toLowerCase();
                   const isUpdating = updatingId === member.id;
+                  const isActive = currentSt === 'active' || currentSt === 'member';
 
                   return (
                     <tr key={member.id} className="table-row-hover animate-fade-in" style={{ animationDelay: `${idx * 15}ms` }}>
@@ -200,11 +207,11 @@ export default function MembersPage() {
                       <td className="px-4 py-3">
                         <div className="relative inline-block">
                           <select
-                            value={currentSt}
+                            value={isActive ? 'active' : currentSt === 'inactive' ? 'inactive' : 'visitor'}
                             disabled={isUpdating}
                             onChange={(e) => handleStatusChange(member.id, e.target.value)}
                             className={`px-3 py-1 rounded-full text-xs font-semibold capitalize border focus:outline-none cursor-pointer transition-all ${
-                              currentSt === 'active'
+                              isActive
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                                 : currentSt === 'inactive'
                                 ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
@@ -212,7 +219,7 @@ export default function MembersPage() {
                             } ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
                           >
                             <option value="visitor" className="bg-navy-dark text-white">visitor</option>
-                            <option value="active" className="bg-navy-dark text-white">active (member)</option>
+                            <option value="active" className="bg-navy-dark text-white">active member</option>
                             <option value="inactive" className="bg-navy-dark text-white">inactive</option>
                           </select>
                         </div>
