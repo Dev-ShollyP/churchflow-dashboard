@@ -8,7 +8,7 @@ import {
   Calendar, MapPin, Clock, Sparkles, Plus, Trash2,
   CalendarDays, Link2, FileText, X, Loader2, CheckCircle, ImagePlus, Image as ImageIcon
 } from 'lucide-react';
-import { format, parseISO, isAfter, startOfDay } from 'date-fns';
+import { format, parseISO, addDays, startOfWeek, isSameDay } from 'date-fns';
 
 interface SpecialProgram {
   id: string;
@@ -23,7 +23,64 @@ interface SpecialProgram {
   created_by?: string;
 }
 
-const defaultForm = { title: '', description: '', flyer_url: '', program_date: '', end_date: '', image_url: '' };
+const defaultProgramForm = { title: '', description: '', flyer_url: '', program_date: '', end_date: '', image_url: '' };
+const defaultEventForm = { title: 'Sunday Celebration Service', description: 'Worship, Word & Breakthrough Session', event_date: '', start_time: '08:00', end_time: '11:30', location: 'Main Sanctuary' };
+
+// Weekly regular church service template helper
+function getNextWeeklyServices() {
+  const today = new Date();
+  const services = [];
+
+  // 1. Next Sunday Worship Service
+  const daysUntilSunday = (7 - today.getDay()) % 7;
+  const nextSunday = addDays(today, daysUntilSunday === 0 && today.getHours() >= 13 ? 7 : daysUntilSunday);
+  const sundayFormatted = format(nextSunday, 'yyyy-MM-dd');
+
+  services.push({
+    id: `regular-sunday-${sundayFormatted}`,
+    title: 'Sunday Worship & Celebration Service',
+    description: 'Join us for an empowering session of praise, worship, and the unadulterated Word of God.',
+    event_date: sundayFormatted,
+    start_time: '08:00',
+    end_time: '11:30',
+    location: 'Main Sanctuary',
+    is_regular: true,
+  });
+
+  // 2. Next Tuesday Digging Deep & Prayer
+  const daysUntilTuesday = (9 - today.getDay()) % 7;
+  const nextTuesday = addDays(today, daysUntilTuesday === 0 && today.getHours() >= 20 ? 7 : daysUntilTuesday);
+  const tuesdayFormatted = format(nextTuesday, 'yyyy-MM-dd');
+
+  services.push({
+    id: `regular-tuesday-${tuesdayFormatted}`,
+    title: 'Digging Deep (Bible Study & Intercession)',
+    description: 'Systematic study of the Scriptures and intensive prayer for spiritual growth.',
+    event_date: tuesdayFormatted,
+    start_time: '18:00',
+    end_time: '19:30',
+    location: 'Main Sanctuary',
+    is_regular: true,
+  });
+
+  // 3. Next Thursday Faith Clinic (Miracle Hour)
+  const daysUntilThursday = (11 - today.getDay()) % 7;
+  const nextThursday = addDays(today, daysUntilThursday === 0 && today.getHours() >= 20 ? 7 : daysUntilThursday);
+  const thursdayFormatted = format(nextThursday, 'yyyy-MM-dd');
+
+  services.push({
+    id: `regular-thursday-${thursdayFormatted}`,
+    title: 'Faith Clinic (Miracle Hour)',
+    description: 'A powerful hour of faith, healing, deliverance, and prophetic declarations.',
+    event_date: thursdayFormatted,
+    start_time: '18:00',
+    end_time: '19:00',
+    location: 'Main Sanctuary',
+    is_regular: true,
+  });
+
+  return services;
+}
 
 export default function EventsPage() {
   const [tab, setTab] = useState<'events' | 'programs'>('events');
@@ -31,12 +88,15 @@ export default function EventsPage() {
   // Events state
   const [events, setEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [eventForm, setEventForm] = useState(defaultEventForm);
+  const [savingEvent, setSavingEvent] = useState(false);
 
   // Special Programs state
   const [programs, setPrograms] = useState<SpecialProgram[]>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState(defaultForm);
+  const [form, setForm] = useState(defaultProgramForm);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [canWrite, setCanWrite] = useState(false);
@@ -68,7 +128,16 @@ export default function EventsPage() {
       .gte('event_date', localToday)
       .order('event_date', { ascending: true })
       .limit(50);
-    setEvents(data ?? []);
+
+    const fetched = data ?? [];
+
+    // If no manual events exist in DB, fallback to show regular weekly services
+    if (fetched.length === 0) {
+      setEvents(getNextWeeklyServices());
+    } else {
+      setEvents(fetched);
+    }
+
     setEventsLoading(false);
   }
 
@@ -89,13 +158,38 @@ export default function EventsPage() {
     setImagePreview(URL.createObjectURL(file));
   }
 
+  async function handleAddEvent() {
+    if (!eventForm.title.trim() || !eventForm.event_date) return;
+    setSavingEvent(true);
+
+    try {
+      const { error } = await supabase.from('events').insert({
+        title: eventForm.title.trim(),
+        description: eventForm.description.trim() || null,
+        event_date: eventForm.event_date,
+        start_time: eventForm.start_time || '08:00',
+        end_time: eventForm.end_time || '11:30',
+        location: eventForm.location.trim() || 'Main Sanctuary',
+      });
+
+      if (error) throw error;
+
+      showToast('success', 'Event created successfully!');
+      setShowEventModal(false);
+      setEventForm(defaultEventForm);
+      loadEvents();
+    } catch (e: any) {
+      showToast('error', e.message || 'Failed to create event.');
+    } finally {
+      setSavingEvent(false);
+    }
+  }
+
   async function handleAddProgram() {
     if (!form.title.trim()) return;
     setSaving(true);
-    const staff = await getCurrentStaff();
 
     let uploadedImageUrl = '';
-    // Upload image to Supabase Storage if selected
     if (imageFile) {
       try {
         const ext = imageFile.name.split('.').pop();
@@ -119,33 +213,32 @@ export default function EventsPage() {
       program_date: form.program_date || null,
       end_date: form.end_date || null,
       is_active: true,
-      created_by: staff?.full_name || staff?.email || 'staff',
     });
+
     setSaving(false);
+
     if (error) {
       showToast('error', error.message);
     } else {
-      showToast('success', `"${form.title}" added!`);
-      setForm(defaultForm);
+      showToast('success', 'Special Program created!');
+      setShowModal(false);
+      setForm(defaultProgramForm);
       setImageFile(null);
       setImagePreview(null);
-      setShowModal(false);
       loadPrograms();
     }
   }
 
-  async function handleDeleteProgram(id: string, title: string) {
-    if (!confirm(`Remove "${title}"?`)) return;
+  async function handleDeleteProgram(id: string) {
     setDeletingId(id);
-    await supabase.from('special_programs').delete().eq('id', id);
+    const { error } = await supabase.from('special_programs').delete().eq('id', id);
     setDeletingId(null);
-    showToast('success', `"${title}" removed.`);
-    loadPrograms();
-  }
-
-  async function handleToggleActive(prog: SpecialProgram) {
-    await supabase.from('special_programs').update({ is_active: !prog.is_active }).eq('id', prog.id);
-    loadPrograms();
+    if (error) {
+      showToast('error', error.message);
+    } else {
+      showToast('success', 'Special Program deleted.');
+      setPrograms(prev => prev.filter(p => p.id !== id));
+    }
   }
 
   function showToast(type: 'success' | 'error', msg: string) {
@@ -153,42 +246,53 @@ export default function EventsPage() {
     setTimeout(() => setToast(null), 4000);
   }
 
-  const today = startOfDay(new Date());
-  const upcoming = events.filter((e: any) =>
-    isAfter(parseISO(e.event_date), today) || parseISO(e.event_date).getTime() === today.getTime()
-  ).length;
-
   return (
     <DashboardShell>
-      {/* Toast */}
+      {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium shadow-xl animate-slide-up
-          ${toast.type === 'success' ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300' : 'bg-red-500/20 border border-red-500/30 text-red-300'}`}>
-          <CheckCircle size={15} />
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl border flex items-center gap-2 text-xs font-semibold animate-slide-up ${
+          toast.type === 'success' ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40' : 'bg-red-950/90 text-red-300 border-red-500/40'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={16} /> : <X size={16} />}
           {toast.msg}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="font-display font-bold text-xl text-white mb-0.5">Events &amp; Programs</h1>
-          <p className="text-xs text-white/40">
+          <h1 className="font-display text-xl sm:text-2xl font-semibold text-white">Events &amp; Programs</h1>
+          <p className="text-xs sm:text-sm text-white/40 mt-0.5">
             {tab === 'events'
-              ? (eventsLoading ? 'Loading...' : `${upcoming} upcoming · ${events.length} total`)
-              : `Manage special church programs shown on the WhatsApp bot`
-            }
+              ? `${events.length} upcoming church services &amp; events`
+              : `${programs.filter(p => p.is_active).length} active special programs`}
           </p>
         </div>
-        {tab === 'programs' && canWrite && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 hover:scale-105 flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #C9A84C, #8B6914)', color: '#0A0E1A', boxShadow: '0 4px 16px rgba(201,168,76,0.3)' }}
-          >
-            <Plus size={16} />
-            Add Program
-          </button>
+
+        {canWrite && (
+          <div className="flex items-center gap-2">
+            {tab === 'events' ? (
+              <button
+                onClick={() => {
+                  const tomorrow = addDays(new Date(), 1);
+                  setEventForm({ ...defaultEventForm, event_date: format(tomorrow, 'yyyy-MM-dd') });
+                  setShowEventModal(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold btn-gold shadow-gold"
+              >
+                <Plus size={16} />
+                Add Event
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold btn-gold shadow-gold"
+              >
+                <Plus size={16} />
+                Add Program
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -198,9 +302,7 @@ export default function EventsPage() {
         <button
           onClick={() => setTab('events')}
           className={`flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
-            tab === 'events'
-              ? 'text-white'
-              : 'text-white/40 hover:text-white/70'
+            tab === 'events' ? 'text-white' : 'text-white/40 hover:text-white/70'
           }`}
           style={tab === 'events' ? { background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.25)' } : {}}
         >
@@ -210,9 +312,7 @@ export default function EventsPage() {
         <button
           onClick={() => setTab('programs')}
           className={`flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
-            tab === 'programs'
-              ? 'text-white'
-              : 'text-white/40 hover:text-white/70'
+            tab === 'programs' ? 'text-white' : 'text-white/40 hover:text-white/70'
           }`}
           style={tab === 'programs' ? { background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.25)' } : {}}
         >
@@ -227,53 +327,73 @@ export default function EventsPage() {
           {eventsLoading ? (
             <div className="glass-card p-10 text-center text-white/30 text-sm">Loading events...</div>
           ) : events.length === 0 ? (
-            <div className="glass-card p-10">
-              <EmptyState icon={Calendar} title="No upcoming events" description="Past events are hidden. New events will appear here once added." />
+            <div className="glass-card p-10 text-center">
+              <EmptyState icon={Calendar} title="No upcoming events" description="Past events are hidden. Click '+ Add Event' to schedule new services." />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {events.map((event: any, idx: number) => (
-                <div
-                  key={event.id}
-                  className="glass-card p-5 animate-slide-up"
-                  style={{ animationDelay: `${idx * 40}ms` }}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.2)' }}>
-                      <span className="text-lg font-bold leading-none text-gold">
-                        {format(parseISO(event.event_date), 'd')}
-                      </span>
-                      <span className="text-[9px] uppercase leading-none text-gold/60">
-                        {format(parseISO(event.event_date), 'MMM')}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-display font-semibold text-white text-sm leading-tight truncate">{event.title}</h3>
-                      <p className="text-[10px] text-white/35 mt-0.5">{format(parseISO(event.event_date), 'EEEE, yyyy')}</p>
-                    </div>
-                  </div>
+              {events.map((event: any, idx: number) => {
+                const eventDateObj = parseISO(event.event_date);
+                const isTomorrow = isSameDay(eventDateObj, addDays(new Date(), 1));
+                const isToday = isSameDay(eventDateObj, new Date());
 
-                  {event.description && (
-                    <p className="text-xs text-white/45 leading-relaxed mb-3 line-clamp-2">{event.description}</p>
-                  )}
+                return (
+                  <div
+                    key={event.id}
+                    className={`glass-card p-5 animate-slide-up border transition-all ${
+                      isTomorrow || isToday ? 'border-gold/40 shadow-gold' : 'border-white/8'
+                    }`}
+                    style={{ animationDelay: `${idx * 40}ms` }}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
+                          style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.2)' }}>
+                          <span className="text-lg font-bold leading-none text-gold">
+                            {format(eventDateObj, 'd')}
+                          </span>
+                          <span className="text-[9px] uppercase leading-none text-gold/60">
+                            {format(eventDateObj, 'MMM')}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="font-display font-semibold text-white text-base leading-snug">{event.title}</h3>
+                          <p className="text-[11px] text-white/40">{format(eventDateObj, 'EEEE, MMMM d, yyyy')}</p>
+                        </div>
+                      </div>
 
-                  <div className="space-y-1">
-                    {event.start_time && (
-                      <p className="text-[11px] text-white/30 flex items-center gap-1.5">
-                        <Clock size={10} className="text-gold/40" />
-                        {event.start_time}{event.end_time ? ` – ${event.end_time}` : ''}
+                      {/* Today / Tomorrow Badge */}
+                      {isToday && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          TODAY
+                        </span>
+                      )}
+                      {isTomorrow && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/20 text-gold border border-gold/30">
+                          TOMORROW
+                        </span>
+                      )}
+                    </div>
+
+                    {event.description && (
+                      <p className="text-xs text-white/60 mb-4 line-clamp-2 leading-relaxed p-2.5 rounded-lg bg-navy-dark/40 border border-white/5">
+                        {event.description}
                       </p>
                     )}
-                    {event.location && (
-                      <p className="text-[11px] text-white/30 flex items-center gap-1.5">
-                        <MapPin size={10} className="text-gold/40" />
-                        {event.location}
-                      </p>
-                    )}
+
+                    <div className="space-y-1.5 text-xs text-white/50 pt-2 border-t border-white/6">
+                      <div className="flex items-center gap-2">
+                        <Clock size={13} className="text-gold flex-shrink-0" />
+                        <span>{event.start_time} - {event.end_time}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-gold flex-shrink-0" />
+                        <span className="truncate">{event.location}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -282,108 +402,84 @@ export default function EventsPage() {
       {/* ── SPECIAL PROGRAMS TAB ── */}
       {tab === 'programs' && (
         <>
-          {/* Info banner */}
-          <div className="mb-5 glass-card p-4 flex items-start gap-3 border-l-2 border-gold/40">
-            <Sparkles size={14} className="text-gold/60 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-white/55 leading-relaxed">
-              <span className="text-white/80 font-semibold">For non-regular programs only</span> — conferences, conventions, retreats, crusades, etc.
-              Programs added here appear on the WhatsApp bot under &quot;Special Programs&quot;.
-              Toggle a program <span className="text-white/70">off</span> to hide it without deleting.
-            </p>
-          </div>
-
           {programsLoading ? (
-            <div className="glass-card p-12 text-center">
-              <Loader2 size={24} className="animate-spin text-gold/40 mx-auto mb-2" />
-              <p className="text-white/30 text-sm">Loading programs...</p>
-            </div>
+            <div className="glass-card p-10 text-center text-white/30 text-sm">Loading Special Programs...</div>
           ) : programs.length === 0 ? (
-            <div className="glass-card p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.12)' }}>
-                <Sparkles size={28} className="text-gold/30" />
-              </div>
-              <h3 className="font-display font-semibold text-white/60 text-base mb-1">No special programs yet</h3>
-              <p className="text-white/30 text-sm">Click &quot;Add Program&quot; to add conferences, retreats, conventions, or any one-off program.</p>
+            <div className="glass-card p-10 text-center">
+              <EmptyState icon={Sparkles} title="No special programs listed" description="Special programs are for non-regular events. Click '+ Add Program' to post one." />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {programs.map((prog, idx) => (
                 <div
                   key={prog.id}
-                  className={`glass-card overflow-hidden animate-slide-up transition-all duration-200 ${!prog.is_active ? 'opacity-50' : ''}`}
+                  className="glass-card overflow-hidden flex flex-col justify-between animate-slide-up group border border-white/8 hover:border-gold/30 transition-all"
                   style={{ animationDelay: `${idx * 40}ms` }}
                 >
-                  {/* Program image */}
-                  {prog.image_url ? (
-                    <div className="w-full h-40 overflow-hidden">
-                      <img src={prog.image_url} alt={prog.title} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="w-full h-28 flex items-center justify-center"
-                      style={{ background: 'rgba(201,168,76,0.05)', borderBottom: '1px solid rgba(201,168,76,0.08)' }}>
-                      <ImageIcon size={28} className="text-gold/15" />
-                    </div>
-                  )}
-                  <div className="p-5">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-display font-semibold text-white text-sm leading-tight">{prog.title}</h3>
-                      {prog.created_by && (
-                        <p className="text-[10px] text-white/30 mt-0.5">Added by {prog.created_by}</p>
+                  <div>
+                    {prog.image_url ? (
+                      <div className="relative w-full h-44 overflow-hidden bg-navy-dark">
+                        <img
+                          src={prog.image_url}
+                          alt={prog.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-navy-dark/90 via-transparent to-transparent" />
+                      </div>
+                    ) : prog.flyer_url ? (
+                      <div className="relative w-full h-40 overflow-hidden bg-navy-dark/60 flex items-center justify-center border-b border-white/5">
+                        <img
+                          src={prog.flyer_url}
+                          alt={prog.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-24 bg-gradient-to-r from-gold/10 via-gold/5 to-transparent flex items-center justify-center border-b border-white/5">
+                        <Sparkles size={24} className="text-gold/40" />
+                      </div>
+                    )}
+
+                    <div className="p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-display font-semibold text-white text-base sm:text-lg leading-snug">{prog.title}</h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${
+                          prog.is_active ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-white/10 text-white/40'
+                        }`}>
+                          {prog.is_active ? 'Active' : 'Archived'}
+                        </span>
+                      </div>
+
+                      {prog.description && (
+                        <p className="text-xs text-white/60 mb-4 line-clamp-3 leading-relaxed">{prog.description}</p>
                       )}
+
+                      <div className="space-y-1.5 text-xs text-white/40 pt-2 border-t border-white/6">
+                        {prog.program_date && (
+                          <div className="flex items-center gap-2">
+                            <CalendarDays size={13} className="text-gold flex-shrink-0" />
+                            <span>
+                              {format(parseISO(prog.program_date), 'MMM d, yyyy')}
+                              {prog.end_date ? ` - ${format(parseISO(prog.end_date), 'MMM d, yyyy')}` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleToggleActive(prog)}
-                      title={prog.is_active ? 'Click to hide from bot' : 'Click to show on bot'}
-                      className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
-                        prog.is_active
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                          : 'bg-white/5 text-white/30 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      {prog.is_active ? 'Active' : 'Hidden'}
-                    </button>
                   </div>
 
-                  {prog.description && (
-                    <p className="text-xs text-white/45 leading-relaxed mb-3 line-clamp-2">{prog.description}</p>
-                  )}
-
-                  {(prog.program_date || prog.end_date) && (
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <CalendarDays size={11} className="text-gold/40 flex-shrink-0" />
-                      <span className="text-[11px] text-white/35">
-                        {prog.program_date ? format(parseISO(prog.program_date), 'MMM d, yyyy') : ''}
-                        {prog.end_date && prog.program_date ? ` – ${format(parseISO(prog.end_date), 'MMM d, yyyy')}` : ''}
-                        {prog.end_date && !prog.program_date ? `Until ${format(parseISO(prog.end_date), 'MMM d, yyyy')}` : ''}
-                      </span>
-                    </div>
-                  )}
-
-                  {prog.flyer_url && (
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <Link2 size={11} className="text-gold/40 flex-shrink-0" />
-                      <a href={prog.flyer_url} target="_blank" rel="noopener noreferrer"
-                        className="text-[11px] text-gold/70 hover:text-gold underline underline-offset-2 truncate max-w-[200px]">
-                        View Flyer
-                      </a>
-                    </div>
-                  )}
-
                   {canWrite && (
-                    <div className="pt-3 border-t border-white/5">
+                    <div className="px-5 py-3 bg-navy-dark/40 border-t border-white/5 flex items-center justify-end">
                       <button
-                        onClick={() => handleDeleteProgram(prog.id, prog.title)}
+                        onClick={() => handleDeleteProgram(prog.id)}
                         disabled={deletingId === prog.id}
-                        className="flex items-center gap-1.5 text-[11px] text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-50"
+                        className="text-xs text-red-400/70 hover:text-red-300 flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-red-500/10"
                       >
                         {deletingId === prog.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                        Remove
+                        Delete
                       </button>
                     </div>
                   )}
-                  </div>
                 </div>
               ))}
             </div>
@@ -391,131 +487,177 @@ export default function EventsPage() {
         </>
       )}
 
-      {/* Add Program Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
-          <div className="glass-card w-full max-w-lg p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.25)' }}>
-                  <Sparkles size={15} className="text-gold" />
-                </div>
-                <h2 className="font-display font-bold text-white text-base">Add Special Program</h2>
-              </div>
-              <button onClick={() => { setShowModal(false); setForm(defaultForm); setImageFile(null); setImagePreview(null); }}
-                className="text-white/30 hover:text-white/70 transition-colors">
-                <X size={20} />
-              </button>
+      {/* Add Event Modal */}
+      {showEventModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="glass-card w-full max-w-lg p-5 sm:p-6 space-y-4 animate-slide-up border border-gold/30">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="font-display font-semibold text-white text-base">Schedule New Event / Sunday Service</h3>
+              <button onClick={() => setShowEventModal(false)} className="text-white/40 hover:text-white"><X size={18} /></button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-white/60 mb-1.5">
-                  Program Title <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-white/60 mb-1 font-medium">Event / Service Title *</label>
                 <input
                   type="text"
-                  value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Annual Convention, Holy Ghost Congress, Retreat..."
-                  className="w-full px-3 py-2.5 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:border-gold/40 focus:outline-none placeholder-white/20 transition-colors"
+                  value={eventForm.title}
+                  onChange={e => setEventForm({ ...eventForm, title: e.target.value })}
+                  placeholder="e.g. Sunday Worship Celebration"
+                  className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-white/60 mb-1.5">
-                  <FileText size={11} className="inline mr-1 mb-0.5" />
-                  Short Description (optional)
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief description shown to WhatsApp bot members..."
-                  rows={2}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:border-gold/40 focus:outline-none placeholder-white/20 transition-colors resize-none"
-                />
-              </div>
-
-              {/* Image upload */}
-              <div>
-                <label className="block text-xs font-semibold text-white/60 mb-1.5">
-                  <ImagePlus size={11} className="inline mr-1 mb-0.5" />
-                  Program Image (optional)
-                </label>
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative border-2 border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors"
-                  style={{ borderColor: imagePreview ? 'rgba(201,168,76,0.45)' : 'rgba(255,255,255,0.1)' }}
-                >
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                  {imagePreview ? (
-                    <div className="relative">
-                      <img src={imagePreview} alt="Preview" className="w-full h-36 object-cover" />
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                        <p className="text-white text-xs font-semibold">Click to change image</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-5 flex flex-col items-center justify-center gap-1.5">
-                      <ImagePlus size={22} className="text-white/20" />
-                      <p className="text-xs text-white/40">Click to upload program image</p>
-                      <p className="text-[10px] text-white/25">PNG, JPG up to 10MB · shown on the dashboard card</p>
-                    </div>
-                  )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-white/60 mb-1 font-medium">Event Date *</label>
+                  <input
+                    type="date"
+                    value={eventForm.event_date}
+                    onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-white/60 mb-1.5">
-                  <Link2 size={11} className="inline mr-1 mb-0.5" />
-                  Flyer Link (optional)
-                </label>
-                <input
-                  type="url"
-                  value={form.flyer_url}
-                  onChange={e => setForm(f => ({ ...f, flyer_url: e.target.value }))}
-                  placeholder="https://... (Google Drive, Dropbox, etc.)"
-                  className="w-full px-3 py-2.5 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:border-gold/40 focus:outline-none placeholder-white/20 transition-colors"
-                />
+                <div>
+                  <label className="block text-white/60 mb-1 font-medium">Location</label>
+                  <input
+                    type="text"
+                    value={eventForm.location}
+                    onChange={e => setEventForm({ ...eventForm, location: e.target.value })}
+                    placeholder="Main Sanctuary"
+                    className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-white/60 mb-1.5">
-                    <CalendarDays size={11} className="inline mr-1 mb-0.5" />
-                    Start Date
-                  </label>
-                  <input type="date" value={form.program_date}
-                    onChange={e => setForm(f => ({ ...f, program_date: e.target.value }))}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:border-gold/40 focus:outline-none transition-colors"
-                    style={{ colorScheme: 'dark' }} />
+                  <label className="block text-white/60 mb-1 font-medium">Start Time</label>
+                  <input
+                    type="time"
+                    value={eventForm.start_time}
+                    onChange={e => setEventForm({ ...eventForm, start_time: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-white/60 mb-1.5">End Date</label>
-                  <input type="date" value={form.end_date}
-                    onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:border-gold/40 focus:outline-none transition-colors"
-                    style={{ colorScheme: 'dark' }} />
+                  <label className="block text-white/60 mb-1 font-medium">End Time</label>
+                  <input
+                    type="time"
+                    value={eventForm.end_time}
+                    onChange={e => setEventForm({ ...eventForm, end_time: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
                 </div>
               </div>
 
-              <p className="text-[11px] text-white/30 leading-relaxed">
-                💡 Once added, this program appears live on the WhatsApp bot immediately.
-              </p>
+              <div>
+                <label className="block text-white/60 mb-1 font-medium">Description</label>
+                <textarea
+                  rows={3}
+                  value={eventForm.description}
+                  onChange={e => setEventForm({ ...eventForm, description: e.target.value })}
+                  placeholder="Service details, guest ministers, theme, etc..."
+                  className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                />
+              </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowModal(false); setForm(defaultForm); setImageFile(null); setImagePreview(null); }}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white/50 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all">
-                Cancel
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10">
+              <button onClick={() => setShowEventModal(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-white/50 hover:text-white bg-white/5">Cancel</button>
+              <button onClick={handleAddEvent} disabled={savingEvent} className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5">
+                {savingEvent ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                {savingEvent ? 'Saving...' : 'Create Event'}
               </button>
-              <button onClick={handleAddProgram} disabled={saving || !form.title.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-                style={{ background: 'linear-gradient(135deg, #C9A84C, #8B6914)', color: '#0A0E1A', boxShadow: '0 4px 16px rgba(201,168,76,0.3)' }}>
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                {saving ? 'Adding...' : 'Add Program'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Program Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="glass-card w-full max-w-lg p-5 sm:p-6 space-y-4 animate-slide-up border border-gold/30">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="font-display font-semibold text-white text-base">Post Special Program</h3>
+              <button onClick={() => setShowModal(false)} className="text-white/40 hover:text-white"><X size={18} /></button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-white/60 mb-1 font-medium">Program Title *</label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g. Annual Convention / Youth Praise Night"
+                  className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/60 mb-1 font-medium">Program Image / Flyer Upload</label>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-28 rounded-xl border-2 border-dashed border-white/15 hover:border-gold/50 bg-navy-dark/60 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden"
+                >
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center p-2">
+                      <ImagePlus size={20} className="mx-auto text-gold mb-1" />
+                      <p className="text-white/60 text-[11px] font-medium">Click to upload flyer image</p>
+                      <p className="text-white/30 text-[9px]">PNG, JPG, WEBP up to 10MB</p>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-white/60 mb-1 font-medium">Start Date</label>
+                  <input
+                    type="date"
+                    value={form.program_date}
+                    onChange={e => setForm({ ...form, program_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white/60 mb-1 font-medium">End Date</label>
+                  <input
+                    type="date"
+                    value={form.end_date}
+                    onChange={e => setForm({ ...form, end_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-white/60 mb-1 font-medium">Description</label>
+                <textarea
+                  rows={3}
+                  value={form.description}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                  placeholder="Program details, theme, ministers, venue..."
+                  className="w-full px-3 py-2 rounded-xl text-white bg-navy-dark/80 border border-white/10 focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-white/50 hover:text-white bg-white/5">Cancel</button>
+              <button onClick={handleAddProgram} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                {saving ? 'Posting...' : 'Post Program'}
               </button>
             </div>
           </div>
