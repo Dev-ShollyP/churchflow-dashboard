@@ -32,15 +32,14 @@ export async function POST(request: Request) {
       }
     );
 
-    // 1. Fetch connected WhatsApp session & token from Supabase
+    // 1. Resolve Phone Number ID — env var takes priority, then DB session
     const { data: session } = await supabase
       .from('whatsapp_sessions')
       .select('phone_number_id, access_token')
-      .eq('status', 'connected')
       .limit(1)
       .single();
 
-    const phoneNumberId = session?.phone_number_id;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || session?.phone_number_id;
     const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN || session?.access_token;
 
     let metaStatusMessage = '';
@@ -48,6 +47,10 @@ export async function POST(request: Request) {
 
     // Clean phone number (must be digits only, no + or spaces)
     const formattedPhone = (member_phone || '').replace(/\D/g, '');
+
+    if (!formattedPhone) {
+      metaStatusMessage = 'No phone number provided for this member.';
+    }
 
     // 2. Send via Meta WhatsApp Cloud API if token & phone ID exist
     if (phoneNumberId && whatsappToken && formattedPhone) {
@@ -72,13 +75,22 @@ export async function POST(request: Request) {
           metaDelivered = true;
           metaStatusMessage = 'WhatsApp message delivered to member phone!';
         } else {
-          metaStatusMessage = `Meta WhatsApp Error: ${metaData.error?.message || JSON.stringify(metaData)}`;
+          // Surface the exact Meta error so the dashboard can show it
+          const errMsg = metaData.error?.message || metaData.error?.error_data?.details || JSON.stringify(metaData);
+          metaStatusMessage = `Meta API Error: ${errMsg}`;
+          console.error('[WhatsApp Reply] Meta API error:', metaData);
         }
       } catch (err: any) {
-        metaStatusMessage = `Meta Network Error: ${err.message}`;
+        metaStatusMessage = `Network Error reaching Meta API: ${err.message}`;
+        console.error('[WhatsApp Reply] Fetch error:', err);
       }
     } else {
-      metaStatusMessage = 'Missing WHATSAPP_ACCESS_TOKEN in .env.local or whatsapp_sessions table.';
+      const missing = [];
+      if (!phoneNumberId) missing.push('WHATSAPP_PHONE_NUMBER_ID env var (and whatsapp_sessions.phone_number_id)');
+      if (!whatsappToken) missing.push('WHATSAPP_ACCESS_TOKEN env var');
+      if (!formattedPhone) missing.push('member phone number');
+      metaStatusMessage = `Cannot send: missing ${missing.join(', ')}.`;
+      console.warn('[WhatsApp Reply] Missing config:', metaStatusMessage);
     }
 
     // 3. Save outbound message to Supabase messages table
