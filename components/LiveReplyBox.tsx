@@ -50,7 +50,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
       } else {
         setStatus({
           type: 'warning',
-          text: `Saved to thread. ${data.meta_status}`,
+          text: `⚠ Saved to thread but NOT delivered. ${data.meta_status}`,
         });
       }
 
