@@ -18,7 +18,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
 
   // Template Modal State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('human_agent_takeover');
+  const [selectedTemplate, setSelectedTemplate] = useState('staff_followup');
   const [staffName, setStaffName] = useState('Pastor / Staff Member');
   const [paramMemberName, setParamMemberName] = useState(memberName || 'Member');
   const [paramStaffName, setParamStaffName] = useState('Pastor / Staff Member');
@@ -86,7 +86,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
     setStatus(null);
 
     let finalParams: string[] = [];
-    if (selectedTemplate === 'human_agent_takeover') {
+    if (selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') {
       finalParams = [paramMemberName.trim(), paramStaffName.trim()];
     } else if (customParams.trim()) {
       finalParams = customParams.split(',').map(s => s.trim());
@@ -100,6 +100,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
           conversation_id: conversationId,
           member_phone: memberPhone,
           template_name: selectedTemplate,
+          language_code: 'en',
           parameters: finalParams,
         }),
       });
@@ -258,14 +259,14 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                   style={{ backgroundColor: '#091124', color: '#ffffff' }}
                   className="w-full px-3.5 py-2.5 rounded-xl text-xs text-white border border-white/20 focus:border-gold/60 focus:outline-none cursor-pointer"
                 >
+                  <option value="staff_followup" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
+                    Staff Followup / Chat Handoff (staff_followup - Meta Approved ✅)
+                  </option>
                   <option value="human_agent_takeover" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
-                    Human Agent Chat Takeover (Staff Handoff)
+                    Human Agent Takeover (human_agent_takeover)
                   </option>
                   <option value="service_reminder" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
                     Church Service &amp; Program Reminder (service_reminder)
-                  </option>
-                  <option value="hello_world" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
-                    Meta Default Test (hello_world)
                   </option>
                   <option value="custom" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
                     Custom Approved Template
@@ -274,7 +275,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
               </div>
 
               {/* Dynamic Preset Inputs */}
-              {selectedTemplate === 'human_agent_takeover' && (
+              {(selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') && (
                 <div
                   style={{ backgroundColor: '#060B18' }}
                   className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-white/10"
@@ -334,9 +335,9 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                   <span>Meta Live Message Preview</span>
                 </div>
                 <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-xs text-white/90 leading-relaxed font-sans">
-                  {selectedTemplate === 'human_agent_takeover' ? (
+                  {(selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') ? (
                     <span>
-                      Hello <strong>{paramMemberName || '{{1}}'}</strong>, this is <strong>{paramStaffName || '{{2}}'}</strong> from RCCG Everflourishing Mega Sanctuary. Regarding your message to our church line, I am available to chat with you now. How can we assist or pray with you today?
+                      Hello Brother/Sister <strong>{paramMemberName || '{{1}}'}</strong>, this is Pastor <strong>{paramStaffName || '{{2}}'}</strong> from RCCG Everflourishing Mega Sanctuary. Regarding your message to our church line, I am available to chat with you now. How can we assist or pray with you today?
                     </span>
                   ) : selectedTemplate === 'service_reminder' ? (
                     <span>
