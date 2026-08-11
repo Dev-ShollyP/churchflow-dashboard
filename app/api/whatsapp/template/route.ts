@@ -45,7 +45,7 @@ async function sendMetaTemplate(
 
 export async function POST(request: Request) {
   try {
-    const { conversation_id, member_phone, template_name, language_code = 'en_US', parameters = [] } = await request.json();
+    const { conversation_id, member_phone, template_name = 'staff_followup', language_code = 'en', parameters = [] } = await request.json();
 
     if (!conversation_id || !template_name) {
       return NextResponse.json({ error: 'Missing conversation_id or template_name' }, { status: 400 });
@@ -95,17 +95,12 @@ export async function POST(request: Request) {
         ]
       : [];
 
-    // Attempt 1: Try language_code (e.g. en_US)
+    // Attempt 1: Try language_code (e.g. 'en')
     let metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, template_name, language_code, templateComponents);
 
-    // Attempt 2: If language code failed (#132001), try 'en' fallback
-    if (!metaRes.ok && metaRes.data?.error?.code === 132001 && language_code !== 'en') {
-      metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, template_name, 'en', templateComponents);
-    }
-
-    // Attempt 3: If template doesn't exist (#132001), try 'hello_world' fallback (Meta default template)
-    if (!metaRes.ok && metaRes.data?.error?.code === 132001 && template_name !== 'hello_world') {
-      metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, 'hello_world', 'en_US', []);
+    // Attempt 2: If 'en' failed with #132001, try 'en_US' fallback
+    if (!metaRes.ok && metaRes.data?.error?.code === 132001 && language_code !== 'en_US') {
+      metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, template_name, 'en_US', templateComponents);
     }
 
     const templateSummary = `[Template: ${template_name}] ${parameters.join(' | ')}`.trim();
@@ -122,7 +117,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         delivered: false,
-        warning: `Saved to chat thread, but Meta returned error: ${errMsg}. Make sure template '${template_name}' is created and approved in Meta WhatsApp Manager.`,
+        warning: `Saved to chat thread, but Meta returned error: ${errMsg}`,
         meta_data: metaRes.data,
       });
     }
