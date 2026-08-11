@@ -4,6 +4,45 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+async function sendMetaTemplate(
+  phoneNumberId: string,
+  whatsappToken: string,
+  formattedPhone: string,
+  templateName: string,
+  langCode: string,
+  components: any[]
+) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${whatsappToken}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: langCode },
+          components,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+    const data = await res.json();
+    return { ok: res.ok && !!data.messages, data };
+  } catch (err: any) {
+    return { ok: false, data: { error: { message: err.name === 'AbortError' ? 'Meta API timeout (8s)' : err.message } } };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { conversation_id, member_phone, template_name, language_code = 'en_US', parameters = [] } = await request.json();
@@ -56,38 +95,17 @@ export async function POST(request: Request) {
         ]
       : [];
 
-    let metaData: any = null;
-    let metaOk = false;
+    // Attempt 1: Try language_code (e.g. en_US)
+    let metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, template_name, language_code, templateComponents);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+    // Attempt 2: If language code failed (#132001), try 'en' fallback
+    if (!metaRes.ok && metaRes.data?.error?.code === 132001 && language_code !== 'en') {
+      metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, template_name, 'en', templateComponents);
+    }
 
-      const metaRes = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${whatsappToken}`,
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: formattedPhone,
-          type: 'template',
-          template: {
-            name: template_name,
-            language: { code: language_code },
-            components: templateComponents,
-          },
-        }),
-      });
-
-      clearTimeout(timeoutId);
-      metaData = await metaRes.json();
-      metaOk = metaRes.ok && !!metaData.messages;
-    } catch (metaErr: any) {
-      console.error('[WhatsApp Template] Meta fetch error:', metaErr);
-      metaData = { error: { message: metaErr.name === 'AbortError' ? 'Meta API timeout (8s)' : metaErr.message } };
+    // Attempt 3: If template doesn't exist (#132001), try 'hello_world' fallback (Meta default template)
+    if (!metaRes.ok && metaRes.data?.error?.code === 132001 && template_name !== 'hello_world') {
+      metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, 'hello_world', 'en_US', []);
     }
 
     const templateSummary = `[Template: ${template_name}] ${parameters.join(' | ')}`.trim();
@@ -99,20 +117,20 @@ export async function POST(request: Request) {
       message: templateSummary,
     });
 
-    if (!metaOk) {
-      const errMsg = metaData?.error?.message || metaData?.error?.error_data?.details || 'Meta API delivery failed';
+    if (!metaRes.ok) {
+      const errMsg = metaRes.data?.error?.message || metaRes.data?.error?.error_data?.details || 'Meta API delivery failed';
       return NextResponse.json({
         success: true,
         delivered: false,
-        warning: `Saved to chat thread, but Meta WhatsApp Cloud API returned error: ${errMsg}`,
-        meta_data: metaData,
+        warning: `Saved to chat thread, but Meta returned error: ${errMsg}. Make sure template '${template_name}' is created and approved in Meta WhatsApp Manager.`,
+        meta_data: metaRes.data,
       });
     }
 
     return NextResponse.json({
       success: true,
       delivered: true,
-      meta_data: metaData,
+      meta_data: metaRes.data,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
