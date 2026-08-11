@@ -1,0 +1,318 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Custom Easing Variables (Emil Kowalski Motion Framework) ── */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Theme 1: Royal Navy & Gold (Default) ── */
+:root, [data-theme="royal-navy"] {
+  --bg-gradient: radial-gradient(ellipse at 15% 15%, oklch(0.16 0.04 260) 0%, oklch(0.12 0.03 265) 60%, oklch(0.08 0.02 270) 100%);
+  --sidebar-bg: oklch(0.11 0.03 265 / 0.85);
+  --card-bg: oklch(0.15 0.04 265 / 0.65);
+  --card-border: oklch(0.78 0.16 75 / 0.18);
+  --accent-gold: oklch(0.78 0.16 75);
+  --accent-gold-light: oklch(0.88 0.12 85);
+  --accent-gold-dark: oklch(0.58 0.14 70);
+  --border-gold: oklch(0.78 0.16 75 / 0.18);
+  --hover-bg: oklch(0.20 0.05 265 / 0.60);
+  --glow-color: oklch(0.78 0.16 75 / 0.16);
+  --pill-open-bg: oklch(0.72 0.19 145 / 0.14);
+  --pill-open-text: oklch(0.85 0.16 145);
+  --pill-open-border: oklch(0.72 0.19 145 / 0.30);
+}
+
+/* ── Theme 2: Celestial Purple ── */
+[data-theme="celestial-purple"] {
+  --bg-gradient: radial-gradient(ellipse at 15% 15%, oklch(0.16 0.06 295) 0%, oklch(0.12 0.04 295) 60%, oklch(0.08 0.03 300) 100%);
+  --sidebar-bg: oklch(0.10 0.05 295 / 0.85);
+  --card-bg: oklch(0.15 0.06 295 / 0.65);
+  --card-border: oklch(0.82 0.17 80 / 0.20);
+  --accent-gold: oklch(0.82 0.17 80);
+  --accent-gold-light: oklch(0.90 0.12 85);
+  --accent-gold-dark: oklch(0.60 0.15 75);
+  --border-gold: oklch(0.82 0.17 80 / 0.20);
+  --hover-bg: oklch(0.22 0.07 295 / 0.60);
+  --glow-color: oklch(0.82 0.17 80 / 0.18);
+  --pill-open-bg: oklch(0.72 0.19 145 / 0.14);
+  --pill-open-text: oklch(0.85 0.16 145);
+  --pill-open-border: oklch(0.72 0.19 145 / 0.30);
+}
+
+/* ── Theme 3: Emerald Sanctuary ── */
+[data-theme="emerald-sanctuary"] {
+  --bg-gradient: radial-gradient(ellipse at 15% 15%, oklch(0.16 0.05 165) 0%, oklch(0.12 0.04 165) 60%, oklch(0.08 0.02 170) 100%);
+  --sidebar-bg: oklch(0.10 0.04 165 / 0.85);
+  --card-bg: oklch(0.15 0.05 165 / 0.65);
+  --card-border: oklch(0.80 0.15 85 / 0.20);
+  --accent-gold: oklch(0.80 0.15 85);
+  --accent-gold-light: oklch(0.89 0.11 90);
+  --accent-gold-dark: oklch(0.58 0.13 80);
+  --border-gold: oklch(0.80 0.15 85 / 0.20);
+  --hover-bg: oklch(0.20 0.06 165 / 0.60);
+  --glow-color: oklch(0.80 0.15 85 / 0.18);
+  --pill-open-bg: oklch(0.72 0.19 145 / 0.14);
+  --pill-open-text: oklch(0.85 0.16 145);
+  --pill-open-border: oklch(0.72 0.19 145 / 0.30);
+}
+
+/* ── Theme 4: Obsidian Gold ── */
+[data-theme="obsidian-gold"] {
+  --bg-gradient: radial-gradient(ellipse at 15% 15%, oklch(0.12 0.02 260) 0%, oklch(0.08 0.01 260) 60%, oklch(0.05 0.01 260) 100%);
+  --sidebar-bg: oklch(0.08 0.02 260 / 0.88);
+  --card-bg: oklch(0.12 0.02 260 / 0.70);
+  --card-border: oklch(0.84 0.18 78 / 0.22);
+  --accent-gold: oklch(0.84 0.18 78);
+  --accent-gold-light: oklch(0.92 0.12 85);
+  --accent-gold-dark: oklch(0.62 0.15 72);
+  --border-gold: oklch(0.84 0.18 78 / 0.22);
+  --hover-bg: oklch(0.16 0.03 260 / 0.60);
+  --glow-color: oklch(0.84 0.18 78 / 0.20);
+  --pill-open-bg: oklch(0.72 0.19 145 / 0.14);
+  --pill-open-text: oklch(0.85 0.16 145);
+  --pill-open-border: oklch(0.72 0.19 145 / 0.30);
+}
+
+/* ── Base Reset & Typography ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  color: oklch(0.96 0.01 260);
+  min-height: 100vh;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(1 0 0 / 0.15);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-gold);
+}
+
+/* ── Focus Ring ── */
+:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* ── Tactile Press Feedback (Emil Kowalski Craft Rule) ── */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms var(--ease-out), background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+button:active, a:active, [role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* ── Typography Gradients ── */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #FFF0C3 0%, #C9A84C 50%, #9B7924 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+/* ── Glassmorphism Card System ── */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 200ms var(--ease-out), border-color 200ms ease, box-shadow 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .glass-card-hover:hover {
+    border-color: oklch(0.80 0.16 75 / 0.35);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px var(--glow-color);
+    transform: translateY(-2px);
+  }
+}
+
+/* ── Premium Buttons ── */
+.btn-gold {
+  background: linear-gradient(135deg, var(--accent-gold-light) 0%, var(--accent-gold) 50%, var(--accent-gold-dark) 100%);
+  color: oklch(0.12 0.03 265);
+  font-weight: 600;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px var(--glow-color);
+  transition: transform 160ms var(--ease-out), filter 160ms ease, box-shadow 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-gold:hover {
+    box-shadow: 0 6px 26px oklch(0.80 0.16 75 / 0.38);
+    filter: brightness(1.06);
+  }
+}
+
+.btn-gold:active {
+  transform: scale(0.97);
+}
+
+.btn-glass {
+  background: oklch(1 0 0 / 0.06);
+  border: 1px solid oklch(1 0 0 / 0.12);
+  color: oklch(0.96 0.01 260);
+  border-radius: 12px;
+  transition: transform 160ms var(--ease-out), background-color 160ms ease, border-color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-glass:hover {
+    background: oklch(1 0 0 / 0.12);
+    border-color: var(--card-border);
+  }
+}
+
+.btn-glass:active {
+  transform: scale(0.97);
+}
+
+/* ── Stat Card Hover Glow ── */
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 200ms var(--ease-out), box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--card-border), transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), 0 0 25px var(--glow-color);
+    border-color: oklch(0.80 0.16 75 / 0.35);
+  }
+}
+
+/* ── Navigation Active Indicator ── */
+.nav-active {
+  background: linear-gradient(90deg, oklch(0.78 0.16 75 / 0.22) 0%, oklch(0.78 0.16 75 / 0.05) 100%);
+  border-left: 3px solid var(--accent-gold);
+  color: var(--accent-gold-light);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06);
+}
+
+/* ── Table Row Hover ── */
+.table-row-hover {
+  transition: background-color 150ms ease, transform 150ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .table-row-hover:hover {
+    background: var(--hover-bg);
+  }
+}
+
+/* ── Status Pill Badges (OKLCH translucent fills) ── */
+.pill-open {
+  background: var(--pill-open-bg);
+  color: var(--pill-open-text);
+  border: 1px solid var(--pill-open-border);
+}
+
+.pill-closed {
+  background: oklch(0.60 0.02 260 / 0.12);
+  color: oklch(0.80 0.02 260);
+  border: 1px solid oklch(0.60 0.02 260 / 0.25);
+}
+
+.pill-pending {
+  background: oklch(0.80 0.16 85 / 0.14);
+  color: oklch(0.90 0.14 85);
+  border: 1px solid oklch(0.80 0.16 85 / 0.30);
+}
+
+.pill-answered {
+  background: oklch(0.65 0.18 240 / 0.14);
+  color: oklch(0.82 0.14 240);
+  border: 1px solid oklch(0.65 0.18 240 / 0.30);
+}
+
+/* ── Message Bubbles ── */
+.bubble-member {
+  background: oklch(0.20 0.04 265 / 0.85);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 18px 18px 18px 4px;
+}
+
+.bubble-assistant {
+  background: linear-gradient(135deg, oklch(0.78 0.16 75 / 0.22) 0%, oklch(0.78 0.16 75 / 0.10) 100%);
+  border: 1px solid var(--border-gold);
+  border-radius: 18px 18px 4px 18px;
+}
+
+/* ── Entrance Animations (Never from scale 0!) ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes popoverIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 200ms var(--ease-out) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 200ms var(--ease-out) forwards;
+}
+
+.animate-popover {
+  animation: popoverIn 180ms var(--ease-out) forwards;
+  transform-origin: top right;
+}
+
+/* ── Reduced Motion Accessibility ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
