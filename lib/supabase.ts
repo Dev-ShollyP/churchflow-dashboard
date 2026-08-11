@@ -12,7 +12,8 @@ export type PermissionKey =
   | 'programs'
   | 'onboarding'
   | 'staff'
-  | 'settings';
+  | 'settings'
+  | 'hymns';
 
 export interface StaffMember {
   id: string;
@@ -26,12 +27,12 @@ export interface StaffMember {
 }
 
 export const defaultRolePermissions: Record<StaffRole, PermissionKey[]> = {
-  admin:        ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'onboarding', 'staff', 'settings'],
-  developer:    ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'onboarding', 'staff', 'settings'],
-  pastor:       ['overview', 'members', 'conversations', 'prayers', 'events', 'programs', 'onboarding'],
-  media_team:   ['events', 'upload', 'programs', 'onboarding'],
-  followup_team:['overview', 'conversations', 'members'],
-  prayer_team:  ['overview', 'prayers', 'members', 'conversations'],
+  admin:        ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'onboarding', 'staff', 'settings', 'hymns'],
+  developer:    ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'onboarding', 'staff', 'settings', 'hymns'],
+  pastor:       ['overview', 'members', 'conversations', 'prayers', 'events', 'programs', 'onboarding', 'hymns'],
+  media_team:   ['events', 'upload', 'programs', 'onboarding', 'hymns'],
+  followup_team:['overview', 'conversations', 'members', 'hymns'],
+  prayer_team:  ['overview', 'prayers', 'members', 'conversations', 'hymns'],
 };
 
 export const roleLabels: Record<StaffRole, { label: string; badgeClass: string; desc: string }> = {
