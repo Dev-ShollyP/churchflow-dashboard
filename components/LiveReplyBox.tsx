@@ -19,9 +19,10 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
   // Template Modal State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('staff_followup');
-  const [staffName, setStaffName] = useState('Pastor / Staff Member');
   const [paramMemberName, setParamMemberName] = useState(memberName || 'Member');
   const [paramStaffName, setParamStaffName] = useState('Pastor / Staff Member');
+  const [serviceTitle, setServiceTitle] = useState('Sunday Worship Celebration');
+  const [serviceTime, setServiceTime] = useState('Tomorrow at 8:00 AM');
   const [customParams, setCustomParams] = useState('');
   const [templateSending, setTemplateSending] = useState(false);
 
@@ -88,6 +89,8 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
     let finalParams: string[] = [];
     if (selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') {
       finalParams = [paramMemberName.trim(), paramStaffName.trim()];
+    } else if (selectedTemplate === 'service_reminder') {
+      finalParams = [serviceTitle.trim(), serviceTime.trim(), paramMemberName.trim()];
     } else if (customParams.trim()) {
       finalParams = customParams.split(',').map(s => s.trim());
     }
@@ -260,7 +263,10 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                   className="w-full px-3.5 py-2.5 rounded-xl text-xs text-white border border-white/20 focus:border-gold/60 focus:outline-none cursor-pointer"
                 >
                   <option value="staff_followup" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
-                    Staff Followup / Chat Handoff (staff_followup - Meta Approved ✅)
+                    Staff Followup / Chat Handoff (staff_followup - Approved ✅)
+                  </option>
+                  <option value="service_reminder" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
+                    Church Service &amp; Program Reminder (service_reminder - Approved ✅)
                   </option>
                   <option value="custom" style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}>
                     Custom Approved Template
@@ -268,7 +274,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                 </select>
               </div>
 
-              {/* Dynamic Preset Inputs */}
+              {/* Dynamic Preset Inputs for staff_followup */}
               {(selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') && (
                 <div
                   style={{ backgroundColor: '#060B18' }}
@@ -296,6 +302,54 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                       value={paramStaffName}
                       onChange={(e) => setParamStaffName(e.target.value)}
                       placeholder="e.g. Olushola"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Preset Inputs for service_reminder */}
+              {selectedTemplate === 'service_reminder' && (
+                <div
+                  style={{ backgroundColor: '#060B18' }}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 rounded-xl border border-white/10"
+                >
+                  <div>
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Service Title &#123;&#123;1&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={serviceTitle}
+                      onChange={(e) => setServiceTitle(e.target.value)}
+                      placeholder="e.g. Sunday Worship"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Date &amp; Time &#123;&#123;2&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={serviceTime}
+                      onChange={(e) => setServiceTime(e.target.value)}
+                      placeholder="e.g. Sunday 8:00 AM"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Member Name &#123;&#123;3&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={paramMemberName}
+                      onChange={(e) => setParamMemberName(e.target.value)}
+                      placeholder="e.g. Ayomide"
                       style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
                       className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
                     />
@@ -331,11 +385,11 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                 <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-xs text-white/90 leading-relaxed font-sans">
                   {(selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') ? (
                     <span>
-                      Hello Brother/Sister <strong>{paramMemberName || '{{1}}'}</strong>, this is Pastor <strong>{paramStaffName || '{{2}}'}</strong> from RCCG Everflourishing Mega Sanctuary. Regarding your message to our church line, I am available to chat with you now. How can we assist or pray with you today?
+                      Hello <strong>{paramMemberName || '{{1}}'}</strong>, this is <strong>{paramStaffName || '{{2}}'}</strong> from RCCG Everflourishing Mega Sanctuary. Regarding your message to our church line, I am available to chat with you now. How can we assist or pray with you today?
                     </span>
                   ) : selectedTemplate === 'service_reminder' ? (
                     <span>
-                      🔔 Hello REMINDER: <strong>HOLY COMMUNION SERVICE</strong> — <strong>IN 30 MINUTES</strong>! Dear <strong>{paramMemberName}</strong>, this is a reminder for our upcoming service...
+                      🔔 Hello REMINDER: <strong>{serviceTitle || '{{1}}'}</strong> — <strong>{serviceTime || '{{2}}'}</strong>! Dear <strong>{paramMemberName || '{{3}}'}</strong>, this is a reminder for our upcoming service at RCCG Everflourishing Mega Sanctuary.
                     </span>
                   ) : (
                     <span>Meta approved template message dispatch...</span>
