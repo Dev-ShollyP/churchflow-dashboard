@@ -1,0 +1,72 @@
+{
+  "church_name": "The Redeemed Christian Church of God (RCCG)",
+  "parish": "RCCG Everflourishing Mega Sanctuary",
+  "province": "Ogun Province 27",
+  "zone": "Zone OG27",
+  "history": {
+    "founded_year": 1952,
+    "founder": "Rev. Josiah Olufemi Akindayomi (1909–1980)",
+    "origin_story": "The RCCG was founded in 1952 by Rev. Josiah Olufemi Akindayomi in Ebute-Metta, Lagos, Nigeria, starting as a small fellowship of nine members called 'Egbe Ogo Oluwa' (Glory of God Fellowship). Pa Akindayomi, an illiterate man in English, received a divine revelation where the exact name 'The Redeemed Christian Church of God' was spelled out on a blackboard.",
+    "succession": "In 1981, Pastor Enoch Adejare Adeboye (Daddy G.O.), a former university mathematics lecturer who joined the church in 1973, succeeded Pa Akindayomi as General Overseer. Under Pastor Adeboye's spiritual leadership, RCCG expanded exponentially into over 190 nations worldwide with tens of thousands of parishes."
+  },
+  "administrative_structure": {
+    "apex_leadership": {
+      "general_overseer": "Pastor E.A. Adeboye — Supreme spiritual and administrative head of the mission worldwide.",
+      "governing_council": "Highest policy-making body assisting the GO with corporate governance, major appointments, and discipline.",
+      "world_advisory_council": "Global advisory body providing broader regional and international policy recommendations."
+    },
+    "hierarchy_levels": [
+      "1. Global Headquarters: Redemption City, Mowe, Ogun State, Nigeria — Central coordinating tier unifying doctrine & global vision.",
+      "2. National / Country Office: Oversees all regions and provinces within a host country (Country Coordinator).",
+      "3. Region: Wider administrative territory comprising multiple provinces, headed by a Regional Coordinator.",
+      "4. Province: Managed by a Pastor in Charge of Province (PICP) & Assistant Pastors in Charge of Province (APICP).",
+      "5. Zone: Collection of Areas supervised by a Zonal Pastor (ZC). (e.g. Zone OG27 led by Zonal Coordinator).",
+      "6. Area: Collection of local Parishes supervised by an Area Pastor.",
+      "7. Parish: Smallest individual local church unit managed by a Parish Pastor / Resident Pastor (e.g. RCCG Everflourishing Mega Sanctuary, led by Deacon Ayobami Lawal).",
+      "8. House Fellowship / Cell: Smallest unit of the church (20-50 members) meeting in homes."
+    ]
+  },
+  "vision_and_mission": [
+    "1. To make heaven.",
+    "2. To take as many people with us.",
+    "3. To have a member of RCCG in every family of all nations.",
+    "4. To accomplish No. 1 above, holiness will be our lifestyle.",
+    "5. To accomplish No. 2 and 3 above, we will plant churches within five minutes walking distance in every city and town of developing nations, and within five minutes driving distance in developed nations."
+  ],
+  "doctrines_and_beliefs": [
+    "• The Holy Bible: The inspired, infallible, inerrant Word of God.",
+    "• The Trinity: One God eternally existent in three persons — Father, Son, and Holy Spirit.",
+    "• Salvation: By grace through faith in Jesus Christ, who died for our sins and rose again.",
+    "• Water Baptism: By full immersion in water as commanded by Jesus Christ.",
+    "• Baptism of the Holy Spirit: With the evidence of speaking in tongues as the Spirit gives utterance.",
+    "• Divine Healing: Provided in the atonement of Christ for bodily healing and physical wellness.",
+    "• Sanctification & Holiness: Essential continuous spiritual growth without which no man shall see the Lord.",
+    "• Restitution: Amending past wrongs or stolen properties where possible.",
+    "• Marital Order: Strict adherence to monogamy. Divorce is highly discouraged and remarriage forbidden while former spouse lives.",
+    "• The Second Coming: The personal, visible, premillennial return of Jesus Christ for His saints.",
+    "• Tithes & Offerings: Faithful payment of 10% tithe and free-will offerings for kingdom advancement."
+  ],
+  "leadership": {
+    "founder": "Rev. Josiah Olufemi Akindayomi (Late Founder)",
+    "general_overseer": "Pastor Enoch Adejare Adeboye (Daddy G.O.)",
+    "mother_in_israel": "Pastor Mrs. Folu Adeboye (Mummy G.O.)",
+    "zonal_pastor": "APICP Afolabi Ebietomiye (Zonal Pastor, Zone OG27 & Assistant Pastor in Charge of Province)",
+    "parish_pastor": "Deacon Ayobami Lawal (Pastor in Charge of Parish, RCCG EVF Sanctuary)",
+    "assistant_ministers": "Deacon Tobi Awobusuyi",
+    "governing_council": "The highest administrative organ overseeing spiritual, doctrinal, and operational leadership of the mission globally."
+  },
+  "major_annual_programs": [
+    "• Monthly Holy Ghost Service: Holds every 1st Friday of the month at the Redemption City, Mowe, Ogun State.",
+    "• Annual Convention: Holds every 1st full week of August at the Redemption City.",
+    "• Holy Ghost Congress: Holds every 2nd week of December at the Redemption City.",
+    "• Special Holy Ghost Service: Holds annually in March to celebrate God's faithfulness."
+  ],
+  "code_of_conduct": [
+    "1. Holiness and Purity: Adherence to biblical standards in thought, speech, and action as a continuous lifestyle.",
+    "2. Diligence and Punctuality: Active and punctual attendance at church services, worker meetings, and cell fellowships.",
+    "3. Modesty and Decency: Moderate and dignified appearance reflecting Christian humility and spiritual maturity.",
+    "4. Submission to Spiritual Authority: Respect for church hierarchy, ministers, and elders in accordance with Hebrews 13:17.",
+    "5. Faithful Stewardship: Regular tithing, free-will offerings, and protection of church property and resources.",
+    "6. Integrity and Peace: Living in peace with all men, maintaining absolute honesty and zero tolerance for fraud, gossip, or malice."
+  ]
+}
