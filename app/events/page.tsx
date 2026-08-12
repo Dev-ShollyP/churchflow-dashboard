@@ -6,7 +6,7 @@ import { createClient, getCurrentStaff } from '@/lib/supabase';
 import EmptyState from '@/components/ui/EmptyState';
 import {
   Calendar, MapPin, Clock, Sparkles, Plus, Trash2, Edit3,
-  CalendarDays, X, Loader2, CheckCircle, ImagePlus, Eye, Send
+  CalendarDays, X, Loader2, CheckCircle, ImagePlus, Eye, BookOpen
 } from 'lucide-react';
 import { format, parseISO, addDays, isSameDay } from 'date-fns';
 import { getCombinedUpcomingEvents, ChurchEvent } from '@/lib/services';
@@ -28,6 +28,7 @@ const defaultProgramForm = { title: '', description: '', flyer_url: '', program_
 const defaultEventForm = {
   id: '',
   title: 'Sunday Worship Celebration',
+  scripture: '',
   description: 'Worship, Word & Breakthrough Session',
   event_date: '',
   start_time: '08:00',
@@ -35,6 +36,31 @@ const defaultEventForm = {
   location: 'Main Sanctuary',
   image_url: '',
 };
+
+/**
+ * Helper to parse embedded metadata tags from description string if columns are missing in DB
+ */
+function parseEventMeta(rawDescription?: string | null): { cleanDescription: string; embeddedFlyer?: string; embeddedScripture?: string } {
+  if (!rawDescription) return { cleanDescription: '' };
+  
+  let cleanDescription = rawDescription;
+  let embeddedFlyer: string | undefined = undefined;
+  let embeddedScripture: string | undefined = undefined;
+
+  const flyerMatch = cleanDescription.match(/\[FLYER:\s*([^\]]+)\]/);
+  if (flyerMatch) {
+    embeddedFlyer = flyerMatch[1].trim();
+    cleanDescription = cleanDescription.replace(/\[FLYER:\s*[^\]]+\]/g, '').trim();
+  }
+
+  const scriptMatch = cleanDescription.match(/\[SCRIPTURE:\s*([^\]]+)\]/);
+  if (scriptMatch) {
+    embeddedScripture = scriptMatch[1].trim();
+    cleanDescription = cleanDescription.replace(/\[SCRIPTURE:\s*[^\]]+\]/g, '').trim();
+  }
+
+  return { cleanDescription, embeddedFlyer, embeddedScripture };
+}
 
 export default function EventsPage() {
   const [tab, setTab] = useState<'events' | 'programs'>('events');
@@ -60,7 +86,7 @@ export default function EventsPage() {
   const [sendBroadcast, setSendBroadcast] = useState(true);
 
   // Full Flyer Viewer Modal State
-  const [selectedFlyer, setSelectedFlyer] = useState<{ title: string; image_url: string; date?: string } | null>(null);
+  const [selectedFlyer, setSelectedFlyer] = useState<{ title: string; image_url: string; date?: string; scripture?: string } | null>(null);
 
   const [canWrite, setCanWrite] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -88,14 +114,24 @@ export default function EventsPage() {
     const now = new Date();
     const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
+    // Select all available columns dynamically
     const { data } = await supabase
       .from('events')
-      .select('id, title, description, event_date, start_time, end_time, location, image_url, flyer_url')
+      .select('*')
       .gte('event_date', localToday)
       .order('event_date', { ascending: true })
       .limit(50);
 
-    const fetched = data ?? [];
+    const fetched = (data ?? []).map((item: any) => {
+      const { cleanDescription, embeddedFlyer, embeddedScripture } = parseEventMeta(item.description);
+      return {
+        ...item,
+        description: cleanDescription,
+        image_url: item.image_url || item.flyer_url || embeddedFlyer,
+        scripture: item.scripture || embeddedScripture,
+      };
+    });
+
     const combined = getCombinedUpcomingEvents(fetched, 28);
     setEvents(combined);
     setEventsLoading(false);
@@ -135,19 +171,21 @@ export default function EventsPage() {
   }
 
   function handleOpenEditEventModal(event: ChurchEvent) {
+    const { cleanDescription, embeddedFlyer, embeddedScripture } = parseEventMeta(event.description);
     setEditingEvent(event);
     setEventForm({
       id: event.id.startsWith('recurring-') ? '' : event.id,
       title: event.title,
-      description: event.description || '',
+      scripture: (event as any).scripture || embeddedScripture || '',
+      description: cleanDescription || '',
       event_date: event.event_date,
       start_time: event.start_time || '08:00',
       end_time: event.end_time || '11:30',
       location: event.location || 'Main Sanctuary',
-      image_url: event.image_url || event.flyer_url || '',
+      image_url: event.image_url || event.flyer_url || embeddedFlyer || '',
     });
     setEventImageFile(null);
-    setEventImagePreview(event.image_url || event.flyer_url || null);
+    setEventImagePreview(event.image_url || event.flyer_url || embeddedFlyer || null);
     setShowEventModal(true);
   }
 
@@ -173,28 +211,42 @@ export default function EventsPage() {
         }
       }
 
-      const payload: any = {
+      // Encode flyer URL and scripture reference safely inside description to prevent schema errors
+      let compositeDescription = eventForm.description.trim();
+      if (uploadedImageUrl) {
+        compositeDescription += `\n[FLYER:${uploadedImageUrl}]`;
+      }
+      if (eventForm.scripture.trim()) {
+        compositeDescription += `\n[SCRIPTURE:${eventForm.scripture.trim()}]`;
+      }
+
+      // Base payload with standard columns guaranteed to exist
+      const standardPayload: any = {
         title: eventForm.title.trim(),
-        description: eventForm.description.trim() || null,
+        description: compositeDescription || null,
         event_date: eventForm.event_date,
         start_time: eventForm.start_time || '08:00',
         end_time: eventForm.end_time || '11:30',
         location: eventForm.location.trim() || 'Main Sanctuary',
-        image_url: uploadedImageUrl || null,
       };
 
       if (eventForm.id) {
-        payload.id = eventForm.id;
+        standardPayload.id = eventForm.id;
       }
 
-      const { error } = await supabase
-        .from('events')
-        .upsert(payload)
-        .select();
+      // 1. First attempt: Try saving with image_url column if supported
+      const fullPayload = { ...standardPayload, image_url: uploadedImageUrl || null };
+      let { error } = await supabase.from('events').upsert(fullPayload).select();
+
+      // 2. Fallback: If DB throws "schema cache" error for missing column, retry with standard payload
+      if (error && error.message.includes('schema cache')) {
+        const fallbackRes = await supabase.from('events').upsert(standardPayload).select();
+        error = fallbackRes.error;
+      }
 
       if (error) throw error;
 
-      showToast('success', editingEvent ? 'Event updated with flyer design!' : 'Event created successfully!');
+      showToast('success', editingEvent ? 'Event updated with flyer design & scripture!' : 'Event created successfully!');
       setShowEventModal(false);
       setEditingEvent(null);
       setEventForm(defaultEventForm);
@@ -385,8 +437,10 @@ export default function EventsPage() {
                 const eventDateObj = parseISO(event.event_date);
                 const isTomorrow = isSameDay(eventDateObj, addDays(new Date(), 1));
                 const isToday = isSameDay(eventDateObj, new Date());
-                const hasFlyer = !!(event.image_url || event.flyer_url);
-                const flyerSrc = event.image_url || event.flyer_url || '';
+                const { cleanDescription, embeddedFlyer, embeddedScripture } = parseEventMeta(event.description);
+                const scriptureText = (event as any).scripture || embeddedScripture;
+                const flyerSrc = event.image_url || event.flyer_url || embeddedFlyer || '';
+                const hasFlyer = !!flyerSrc;
 
                 return (
                   <div
@@ -400,7 +454,7 @@ export default function EventsPage() {
                       {/* Banner Flyer Image Header if attached */}
                       {hasFlyer ? (
                         <div
-                          onClick={() => setSelectedFlyer({ title: event.title, image_url: flyerSrc, date: format(eventDateObj, 'EEEE, MMMM d, yyyy') })}
+                          onClick={() => setSelectedFlyer({ title: event.title, image_url: flyerSrc, date: format(eventDateObj, 'EEEE, MMMM d, yyyy'), scripture: scriptureText })}
                           className="relative w-full h-48 overflow-hidden bg-black/60 cursor-pointer border-b border-white/10 group-hover:opacity-95 transition-opacity"
                         >
                           <img
@@ -416,7 +470,7 @@ export default function EventsPage() {
                       ) : null}
 
                       <div className="p-5">
-                        <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex items-center gap-3.5">
                             <div
                               className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm"
@@ -450,9 +504,17 @@ export default function EventsPage() {
                           </div>
                         </div>
 
-                        {event.description && (
-                          <p className="text-xs text-white/70 mb-4 line-clamp-3 leading-relaxed p-3 rounded-xl bg-black/40 border border-white/5">
-                            {event.description}
+                        {/* Scripture Reference Pill */}
+                        {scriptureText && (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gold/10 border border-gold/25 text-gold text-[11px] font-medium my-2">
+                            <BookOpen size={12} className="text-gold" />
+                            <span>📖 {scriptureText}</span>
+                          </div>
+                        )}
+
+                        {cleanDescription && (
+                          <p className="text-xs text-white/70 mb-4 line-clamp-3 leading-relaxed p-3 rounded-xl bg-black/40 border border-white/5 mt-1">
+                            {cleanDescription}
                           </p>
                         )}
 
@@ -620,6 +682,20 @@ export default function EventsPage() {
                 />
               </div>
 
+              {/* Scripture Reference Input */}
+              <div>
+                <label className="block text-white/60 mb-1 font-semibold flex items-center gap-1 text-gold/90">
+                  <BookOpen size={13} /> Scripture Reference / Theme Verse
+                </label>
+                <input
+                  type="text"
+                  value={eventForm.scripture}
+                  onChange={e => setEventForm({ ...eventForm, scripture: e.target.value })}
+                  placeholder="e.g. Mark 11:23, 1 Cor 10:31, Psalm 23:1"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+
               {/* Event Flyer Design Image Upload */}
               <div>
                 <label className="block text-white/60 mb-1 font-semibold">Event Flyer Graphic / Design</label>
@@ -700,7 +776,7 @@ export default function EventsPage() {
                   rows={3}
                   value={eventForm.description}
                   onChange={e => setEventForm({ ...eventForm, description: e.target.value })}
-                  placeholder="Service Theme (e.g. Mountains Be Removed — Mark 11:23), Guest Ministers, Details..."
+                  placeholder="Service Theme, Guest Ministers, Details..."
                   className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
                 />
               </div>
@@ -831,7 +907,10 @@ export default function EventsPage() {
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-navy-dark/80">
               <div>
                 <h3 className="font-display font-bold text-white text-base">{selectedFlyer.title}</h3>
-                {selectedFlyer.date && <p className="text-xs text-gold">{selectedFlyer.date}</p>}
+                {selectedFlyer.scripture && (
+                  <p className="text-xs text-gold/90 font-medium">📖 {selectedFlyer.scripture}</p>
+                )}
+                {selectedFlyer.date && <p className="text-xs text-white/40">{selectedFlyer.date}</p>}
               </div>
               <button onClick={() => setSelectedFlyer(null)} className="text-white/40 hover:text-white p-1">
                 <X size={20} />
