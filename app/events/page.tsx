@@ -5,11 +5,11 @@ import DashboardShell from '@/components/DashboardShell';
 import { createClient, getCurrentStaff } from '@/lib/supabase';
 import EmptyState from '@/components/ui/EmptyState';
 import {
-  Calendar, MapPin, Clock, Sparkles, Plus, Trash2,
-  CalendarDays, X, Loader2, CheckCircle, ImagePlus, Image as ImageIcon
+  Calendar, MapPin, Clock, Sparkles, Plus, Trash2, Edit3,
+  CalendarDays, X, Loader2, CheckCircle, ImagePlus, Eye, Send
 } from 'lucide-react';
 import { format, parseISO, addDays, isSameDay } from 'date-fns';
-import { getCombinedUpcomingEvents } from '@/lib/services';
+import { getCombinedUpcomingEvents, ChurchEvent } from '@/lib/services';
 
 interface SpecialProgram {
   id: string;
@@ -25,80 +25,50 @@ interface SpecialProgram {
 }
 
 const defaultProgramForm = { title: '', description: '', flyer_url: '', program_date: '', end_date: '', image_url: '' };
-const defaultEventForm = { title: 'Sunday Celebration Service', description: 'Worship, Word & Breakthrough Session', event_date: '', start_time: '08:00', end_time: '11:30', location: 'Main Sanctuary' };
-
-function getNextWeeklyServices() {
-  const today = new Date();
-  const services = [];
-
-  const daysUntilSunday = (7 - today.getDay()) % 7;
-  const nextSunday = addDays(today, daysUntilSunday === 0 && today.getHours() >= 13 ? 7 : daysUntilSunday);
-  const sundayFormatted = format(nextSunday, 'yyyy-MM-dd');
-
-  services.push({
-    id: `regular-sunday-${sundayFormatted}`,
-    title: 'Sunday Worship & Celebration Service',
-    description: 'Join us for an empowering session of praise, worship, and the unadulterated Word of God.',
-    event_date: sundayFormatted,
-    start_time: '08:00',
-    end_time: '11:30',
-    location: 'Main Sanctuary',
-    is_regular: true,
-  });
-
-  const daysUntilTuesday = (9 - today.getDay()) % 7;
-  const nextTuesday = addDays(today, daysUntilTuesday === 0 && today.getHours() >= 20 ? 7 : daysUntilTuesday);
-  const tuesdayFormatted = format(nextTuesday, 'yyyy-MM-dd');
-
-  services.push({
-    id: `regular-tuesday-${tuesdayFormatted}`,
-    title: 'Digging Deep (Bible Study & Intercession)',
-    description: 'Systematic study of the Scriptures and intensive prayer for spiritual growth.',
-    event_date: tuesdayFormatted,
-    start_time: '18:00',
-    end_time: '19:30',
-    location: 'Main Sanctuary',
-    is_regular: true,
-  });
-
-  const daysUntilThursday = (11 - today.getDay()) % 7;
-  const nextThursday = addDays(today, daysUntilThursday === 0 && today.getHours() >= 20 ? 7 : daysUntilThursday);
-  const thursdayFormatted = format(nextThursday, 'yyyy-MM-dd');
-
-  services.push({
-    id: `regular-thursday-${thursdayFormatted}`,
-    title: 'Faith Clinic (Miracle Hour)',
-    description: 'A powerful hour of faith, healing, deliverance, and prophetic declarations.',
-    event_date: thursdayFormatted,
-    start_time: '18:00',
-    end_time: '19:00',
-    location: 'Main Sanctuary',
-    is_regular: true,
-  });
-
-  return services;
-}
+const defaultEventForm = {
+  id: '',
+  title: 'Sunday Worship Celebration',
+  description: 'Worship, Word & Breakthrough Session',
+  event_date: '',
+  start_time: '08:00',
+  end_time: '11:30',
+  location: 'Main Sanctuary',
+  image_url: '',
+};
 
 export default function EventsPage() {
   const [tab, setTab] = useState<'events' | 'programs'>('events');
 
-  const [events, setEvents] = useState<any[]>([]);
+  // Events State
+  const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ChurchEvent | null>(null);
   const [eventForm, setEventForm] = useState(defaultEventForm);
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
   const [savingEvent, setSavingEvent] = useState(false);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
+  // Special Programs State
   const [programs, setPrograms] = useState<SpecialProgram[]>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultProgramForm);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sendBroadcast, setSendBroadcast] = useState(true);
+
+  // Full Flyer Viewer Modal State
+  const [selectedFlyer, setSelectedFlyer] = useState<{ title: string; image_url: string; date?: string } | null>(null);
+
   const [canWrite, setCanWrite] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const eventFileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
 
@@ -117,17 +87,17 @@ export default function EventsPage() {
     setEventsLoading(true);
     const now = new Date();
     const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
     const { data } = await supabase
       .from('events')
-      .select('id, title, description, event_date, start_time, end_time, location')
+      .select('id, title, description, event_date, start_time, end_time, location, image_url, flyer_url')
       .gte('event_date', localToday)
       .order('event_date', { ascending: true })
       .limit(50);
 
     const fetched = data ?? [];
-    const combined = getCombinedUpcomingEvents(fetched, 21);
+    const combined = getCombinedUpcomingEvents(fetched, 28);
     setEvents(combined);
-
     setEventsLoading(false);
   }
 
@@ -148,34 +118,108 @@ export default function EventsPage() {
     setImagePreview(URL.createObjectURL(file));
   }
 
-  async function handleAddEvent() {
+  function handleEventImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEventImageFile(file);
+    setEventImagePreview(URL.createObjectURL(file));
+  }
+
+  function handleOpenNewEventModal() {
+    const tomorrow = addDays(new Date(), 1);
+    setEditingEvent(null);
+    setEventForm({ ...defaultEventForm, event_date: format(tomorrow, 'yyyy-MM-dd') });
+    setEventImageFile(null);
+    setEventImagePreview(null);
+    setShowEventModal(true);
+  }
+
+  function handleOpenEditEventModal(event: ChurchEvent) {
+    setEditingEvent(event);
+    setEventForm({
+      id: event.id.startsWith('recurring-') ? '' : event.id,
+      title: event.title,
+      description: event.description || '',
+      event_date: event.event_date,
+      start_time: event.start_time || '08:00',
+      end_time: event.end_time || '11:30',
+      location: event.location || 'Main Sanctuary',
+      image_url: event.image_url || event.flyer_url || '',
+    });
+    setEventImageFile(null);
+    setEventImagePreview(event.image_url || event.flyer_url || null);
+    setShowEventModal(true);
+  }
+
+  async function handleSaveEvent() {
     if (!eventForm.title.trim() || !eventForm.event_date) return;
     setSavingEvent(true);
 
     try {
-      const { error } = await supabase.from('events').insert({
+      let uploadedImageUrl = eventForm.image_url;
+
+      if (eventImageFile) {
+        const ext = eventImageFile.name.split('.').pop();
+        const fileName = `event_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const filePath = `EventFlyers/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('Flyers')
+          .upload(filePath, eventImageFile, { upsert: true });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('Flyers').getPublicUrl(filePath);
+          uploadedImageUrl = urlData.publicUrl;
+        }
+      }
+
+      const payload: any = {
         title: eventForm.title.trim(),
         description: eventForm.description.trim() || null,
         event_date: eventForm.event_date,
         start_time: eventForm.start_time || '08:00',
         end_time: eventForm.end_time || '11:30',
         location: eventForm.location.trim() || 'Main Sanctuary',
-      });
+        image_url: uploadedImageUrl || null,
+      };
+
+      if (eventForm.id) {
+        payload.id = eventForm.id;
+      }
+
+      const { error } = await supabase
+        .from('events')
+        .upsert(payload)
+        .select();
 
       if (error) throw error;
 
-      showToast('success', 'Event created successfully!');
+      showToast('success', editingEvent ? 'Event updated with flyer design!' : 'Event created successfully!');
       setShowEventModal(false);
+      setEditingEvent(null);
       setEventForm(defaultEventForm);
+      setEventImageFile(null);
+      setEventImagePreview(null);
       loadEvents();
     } catch (e: any) {
-      showToast('error', e.message || 'Failed to create event.');
+      showToast('error', e.message || 'Failed to save event.');
     } finally {
       setSavingEvent(false);
     }
   }
 
-  const [sendBroadcast, setSendBroadcast] = useState(true);
+  async function handleDeleteEvent(eventId: string) {
+    if (eventId.startsWith('recurring-')) return;
+    setDeletingEventId(eventId);
+    const { error } = await supabase.from('events').delete().eq('id', eventId);
+    setDeletingEventId(null);
+    if (error) {
+      showToast('error', error.message);
+    } else {
+      showToast('success', 'Custom event deleted.');
+      loadEvents();
+    }
+  }
 
   async function handleAddProgram() {
     if (!form.title.trim()) return;
@@ -213,7 +257,6 @@ export default function EventsPage() {
       return;
     }
 
-    // Trigger WhatsApp Broadcast Reminder via /api/programs/notify
     if (sendBroadcast) {
       try {
         await fetch('/api/programs/notify', {
@@ -274,7 +317,7 @@ export default function EventsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">Events & Programs</h1>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">Events &amp; Programs</h1>
           <p className="text-xs sm:text-sm text-white/50 mt-1">
             {tab === 'events'
               ? `${events.length} upcoming church services & events`
@@ -286,11 +329,7 @@ export default function EventsPage() {
           <div className="flex items-center gap-2">
             {tab === 'events' ? (
               <button
-                onClick={() => {
-                  const tomorrow = addDays(new Date(), 1);
-                  setEventForm({ ...defaultEventForm, event_date: format(tomorrow, 'yyyy-MM-dd') });
-                  setShowEventModal(true);
-                }}
+                onClick={handleOpenNewEventModal}
                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold btn-gold shadow-gold"
               >
                 <Plus size={16} />
@@ -341,71 +380,121 @@ export default function EventsPage() {
               <EmptyState icon={Calendar} title="No upcoming events" description="Click '+ Add Event' to schedule new services." />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {events.map((event: any, idx: number) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {events.map((event: ChurchEvent, idx: number) => {
                 const eventDateObj = parseISO(event.event_date);
                 const isTomorrow = isSameDay(eventDateObj, addDays(new Date(), 1));
                 const isToday = isSameDay(eventDateObj, new Date());
+                const hasFlyer = !!(event.image_url || event.flyer_url);
+                const flyerSrc = event.image_url || event.flyer_url || '';
 
                 return (
                   <div
                     key={event.id}
-                    className={`glass-card p-5 animate-slide-up border transition-all ${
-                      isTomorrow || isToday ? 'border-gold/40 shadow-gold' : 'border-white/10'
+                    className={`glass-card overflow-hidden flex flex-col justify-between animate-slide-up border transition-all group ${
+                      isTomorrow || isToday ? 'border-gold/50 shadow-gold' : 'border-white/10 hover:border-gold/30'
                     }`}
                     style={{ animationDelay: `${idx * 40}ms` }}
                   >
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-3.5">
+                    <div>
+                      {/* Banner Flyer Image Header if attached */}
+                      {hasFlyer ? (
                         <div
-                          className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm"
-                          style={{ background: 'oklch(0.78 0.16 75 / 0.14)', border: '1px solid oklch(0.78 0.16 75 / 0.25)' }}
+                          onClick={() => setSelectedFlyer({ title: event.title, image_url: flyerSrc, date: format(eventDateObj, 'EEEE, MMMM d, yyyy') })}
+                          className="relative w-full h-48 overflow-hidden bg-black/60 cursor-pointer border-b border-white/10 group-hover:opacity-95 transition-opacity"
                         >
-                          <span className="text-lg font-bold leading-none text-gold">
-                            {format(eventDateObj, 'd')}
-                          </span>
-                          <span className="text-[9px] uppercase font-semibold leading-none text-gold/70 mt-0.5">
-                            {format(eventDateObj, 'MMM')}
-                          </span>
+                          <img
+                            src={flyerSrc}
+                            alt={event.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-navy-dark via-transparent to-transparent opacity-80" />
+                          <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-black/70 backdrop-blur-md text-gold border border-gold/40 flex items-center gap-1">
+                            <Eye size={12} /> View Flyer Design
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-3.5">
+                            <div
+                              className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm"
+                              style={{ background: 'oklch(0.78 0.16 75 / 0.14)', border: '1px solid oklch(0.78 0.16 75 / 0.25)' }}
+                            >
+                              <span className="text-lg font-bold leading-none text-gold">
+                                {format(eventDateObj, 'd')}
+                              </span>
+                              <span className="text-[9px] uppercase font-semibold leading-none text-gold/70 mt-0.5">
+                                {format(eventDateObj, 'MMM')}
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="font-display font-bold text-white text-base leading-snug">{event.title}</h3>
+                              <p className="text-[11px] text-white/40">{format(eventDateObj, 'EEEE, MMMM d, yyyy')}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1">
+                            {isToday && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                TODAY
+                              </span>
+                            )}
+                            {isTomorrow && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gold/20 text-gold border border-gold/30">
+                                TOMORROW
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div>
-                          <h3 className="font-display font-bold text-white text-base leading-snug">{event.title}</h3>
-                          <p className="text-[11px] text-white/40">{format(eventDateObj, 'EEEE, MMMM d, yyyy')}</p>
+                        {event.description && (
+                          <p className="text-xs text-white/70 mb-4 line-clamp-3 leading-relaxed p-3 rounded-xl bg-black/40 border border-white/5">
+                            {event.description}
+                          </p>
+                        )}
+
+                        <div className="space-y-1.5 text-xs text-white/50 pt-2 border-t border-white/10">
+                          <div className="flex items-center gap-2">
+                            <Clock size={13} className="text-gold flex-shrink-0" />
+                            <span>
+                              {event.start_time || '08:00'}
+                              {event.end_time ? ` - ${event.end_time}` : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={13} className="text-gold flex-shrink-0" />
+                            <span className="truncate">{event.location || 'Main Sanctuary'}</span>
+                          </div>
                         </div>
                       </div>
-
-                      {isToday && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          TODAY
-                        </span>
-                      )}
-                      {isTomorrow && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gold/20 text-gold border border-gold/30">
-                          TOMORROW
-                        </span>
-                      )}
                     </div>
 
-                    {event.description && (
-                      <p className="text-xs text-white/70 mb-4 line-clamp-2 leading-relaxed p-3 rounded-xl bg-black/40 border border-white/5">
-                        {event.description}
-                      </p>
+                    {/* Card Action Controls */}
+                    {canWrite && (
+                      <div className="px-5 py-3 bg-black/40 border-t border-white/5 flex items-center justify-between">
+                        <button
+                          onClick={() => handleOpenEditEventModal(event)}
+                          className="text-xs text-gold/90 hover:text-gold font-semibold flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-lg bg-gold/10 hover:bg-gold/20 border border-gold/30"
+                        >
+                          <Edit3 size={13} />
+                          {hasFlyer ? 'Edit Event / Flyer' : 'Attach Flyer / Edit'}
+                        </button>
+
+                        {!event.id.startsWith('recurring-') && (
+                          <button
+                            onClick={() => handleDeleteEvent(event.id)}
+                            disabled={deletingEventId === event.id}
+                            className="text-xs text-red-400/80 hover:text-red-300 flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                          >
+                            {deletingEventId === event.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     )}
-
-                    <div className="space-y-1.5 text-xs text-white/50 pt-2 border-t border-white/10">
-                      <div className="flex items-center gap-2">
-                        <Clock size={13} className="text-gold flex-shrink-0" />
-                        <span>
-                          {event.start_time || '08:00'}
-                          {event.end_time ? ` - ${event.end_time}` : ''}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={13} className="text-gold flex-shrink-0" />
-                        <span className="truncate">{event.location || 'Main Sanctuary'}</span>
-                      </div>
-                    </div>
                   </div>
                 );
               })}
@@ -433,7 +522,10 @@ export default function EventsPage() {
                 >
                   <div>
                     {prog.image_url ? (
-                      <div className="relative w-full h-44 overflow-hidden bg-black/50">
+                      <div
+                        onClick={() => setSelectedFlyer({ title: prog.title, image_url: prog.image_url! })}
+                        className="relative w-full h-44 overflow-hidden bg-black/50 cursor-pointer"
+                      >
                         <img
                           src={prog.image_url}
                           alt={prog.title}
@@ -442,7 +534,10 @@ export default function EventsPage() {
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
                       </div>
                     ) : prog.flyer_url ? (
-                      <div className="relative w-full h-44 overflow-hidden bg-black/50 flex items-center justify-center border-b border-white/5">
+                      <div
+                        onClick={() => setSelectedFlyer({ title: prog.title, image_url: prog.flyer_url! })}
+                        className="relative w-full h-44 overflow-hidden bg-black/50 flex items-center justify-center border-b border-white/5 cursor-pointer"
+                      >
                         <img
                           src={prog.flyer_url}
                           alt={prog.title}
@@ -502,12 +597,14 @@ export default function EventsPage() {
         </>
       )}
 
-      {/* Add Event Modal */}
+      {/* Create / Edit Event Modal */}
       {showEventModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
           <div className="glass-card w-full max-w-lg p-6 space-y-4 animate-popover border border-gold/30">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-display font-semibold text-white text-base">Schedule New Event</h3>
+              <h3 className="font-display font-semibold text-white text-base">
+                {editingEvent ? `Edit Event & Attach Flyer Design` : `Schedule New Event`}
+              </h3>
               <button onClick={() => setShowEventModal(false)} className="text-white/40 hover:text-white"><X size={18} /></button>
             </div>
 
@@ -518,9 +615,40 @@ export default function EventsPage() {
                   type="text"
                   value={eventForm.title}
                   onChange={e => setEventForm({ ...eventForm, title: e.target.value })}
-                  placeholder="e.g. Sunday Worship Celebration"
+                  placeholder="e.g. 3rd Sunday — Youth Sunday / Mountains Be Removed"
                   className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
                 />
+              </div>
+
+              {/* Event Flyer Design Image Upload */}
+              <div>
+                <label className="block text-white/60 mb-1 font-semibold">Event Flyer Graphic / Design</label>
+                <div
+                  onClick={() => eventFileInputRef.current?.click()}
+                  className="w-full h-32 rounded-xl border-2 border-dashed border-white/15 hover:border-gold/50 bg-black/40 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden group"
+                >
+                  {eventImagePreview ? (
+                    <div className="relative w-full h-full">
+                      <img src={eventImagePreview} alt="Flyer Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-semibold">
+                        Click to Change Flyer Image
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center p-3">
+                      <ImagePlus size={22} className="mx-auto text-gold mb-1" />
+                      <p className="text-white/80 text-xs font-medium">Click to upload Event Flyer Design</p>
+                      <p className="text-white/30 text-[10px] mt-0.5">PNG, JPG, WEBP graphic design</p>
+                    </div>
+                  )}
+                  <input
+                    ref={eventFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEventImageChange}
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -567,12 +695,12 @@ export default function EventsPage() {
               </div>
 
               <div>
-                <label className="block text-white/60 mb-1 font-semibold">Description</label>
+                <label className="block text-white/60 mb-1 font-semibold">Description &amp; Theme</label>
                 <textarea
                   rows={3}
                   value={eventForm.description}
                   onChange={e => setEventForm({ ...eventForm, description: e.target.value })}
-                  placeholder="Service details, guest ministers, theme, etc..."
+                  placeholder="Service Theme (e.g. Mountains Be Removed — Mark 11:23), Guest Ministers, Details..."
                   className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
                 />
               </div>
@@ -580,9 +708,9 @@ export default function EventsPage() {
 
             <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10">
               <button onClick={() => setShowEventModal(false)} className="px-4 py-2 rounded-xl text-xs font-semibold btn-glass">Cancel</button>
-              <button onClick={handleAddEvent} disabled={savingEvent} className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5">
+              <button onClick={handleSaveEvent} disabled={savingEvent} className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5">
                 {savingEvent ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                {savingEvent ? 'Saving...' : 'Create Event'}
+                {savingEvent ? 'Saving Event...' : editingEvent ? 'Update Event & Flyer' : 'Create Event'}
               </button>
             </div>
           </div>
@@ -691,6 +819,44 @@ export default function EventsPage() {
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 {saving ? 'Posting...' : 'Post Program'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Flyer Image Modal Viewer */}
+      {selectedFlyer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="glass-card w-full max-w-2xl overflow-hidden rounded-2xl border border-gold/40 shadow-2xl flex flex-col max-h-[90vh] animate-popover">
+            <div className="flex items-center justify-between p-4 border-b border-white/10 bg-navy-dark/80">
+              <div>
+                <h3 className="font-display font-bold text-white text-base">{selectedFlyer.title}</h3>
+                {selectedFlyer.date && <p className="text-xs text-gold">{selectedFlyer.date}</p>}
+              </div>
+              <button onClick={() => setSelectedFlyer(null)} className="text-white/40 hover:text-white p-1">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 bg-black/90 flex items-center justify-center">
+              <img
+                src={selectedFlyer.image_url}
+                alt={selectedFlyer.title}
+                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-2xl"
+              />
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-navy-dark/80 flex items-center justify-between">
+              <span className="text-xs text-white/40">RCCG Everflourishing Sanctuary</span>
+              <a
+                href={selectedFlyer.image_url}
+                target="_blank"
+                rel="noreferrer"
+                download
+                className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5"
+              >
+                Download Flyer Design
+              </a>
             </div>
           </div>
         </div>
