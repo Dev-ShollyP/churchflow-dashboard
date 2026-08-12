@@ -1,4 +1,4 @@
-import { addDays, format, isAfter, isSameDay, setHours, setMinutes, getDate } from 'date-fns';
+import { addDays, format, isAfter, isSameDay, setHours, setMinutes, getDate, getDay } from 'date-fns';
 
 export interface ChurchEvent {
   id: string;
@@ -14,11 +14,6 @@ export interface ChurchEvent {
 
 /**
  * Determines the RCCG Sunday service type by week-of-month.
- * 1st Sunday → Thanksgiving Service
- * 2nd Sunday → Prayer Sunday
- * 3rd Sunday → Youth Sunday
- * 4th Sunday → Super Sunday (Relationship Sunday)
- * 5th Sunday → CSR / Welfare Sunday
  */
 function getSundayServiceType(date: Date): { title: string; description: string } {
   const dayOfMonth = getDate(date); // 1–31
@@ -54,9 +49,10 @@ function getSundayServiceType(date: Date): { title: string; description: string 
   }
 }
 
-const WEEKLY_SERVICES = [
+export const WEEKLY_SERVICES = [
   {
     dayOfWeek: 2, // Tuesday
+    dayName: 'Tuesday',
     title: 'Digging Deep (Bible Study)',
     startTime: '18:00',
     endTime: '19:30',
@@ -65,6 +61,7 @@ const WEEKLY_SERVICES = [
   },
   {
     dayOfWeek: 4, // Thursday
+    dayName: 'Thursday',
     title: 'Faith Clinic (Prayer & Deliverance)',
     startTime: '18:00',
     endTime: '19:00',
@@ -72,18 +69,19 @@ const WEEKLY_SERVICES = [
     description: 'Intercession, Divine Healing & Deliverance Service',
   },
   {
-    dayOfWeek: 0, // Sunday — title & description resolved dynamically
-    title: '',
+    dayOfWeek: 0, // Sunday
+    dayName: 'Sunday',
+    title: 'Sunday Worship Service',
     startTime: '08:00',
     endTime: '12:00',
     location: 'Main Sanctuary',
-    description: '',
+    description: 'Worship, Word & Breakthrough Session',
   },
 ];
 
 /**
  * Returns the single next upcoming service from today onward (first match within 14 days).
- * Prefers a custom DB event on the same day, otherwise returns the recurring weekly service.
+ * Takes exact time into account: if today is service day but start time has passed, jumps to NEXT service day.
  */
 export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): ChurchEvent | null {
   const now = new Date();
@@ -93,21 +91,24 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
     const dayOfWeek = targetDate.getDay();
     const dateStr = format(targetDate, 'yyyy-MM-dd');
 
-    // Check if custom DB event exists on this date
+    // Check custom DB events first
     const customOnDate = customDbEvents.find(ev => ev.event_date === dateStr);
     if (customOnDate) return customOnDate;
 
-    // Check if a weekly service falls on this day
+    // Check weekly services
     const service = WEEKLY_SERVICES.find(s => s.dayOfWeek === dayOfWeek);
     if (service) {
       const [hours, mins] = service.startTime.split(':').map(Number);
-      const serviceDateTime = new Date(targetDate);
-      serviceDateTime.setHours(hours, mins, 0, 0);
+      const serviceEnd = service.endTime ? service.endTime.split(':').map(Number) : [hours + 2, 0];
+      
+      const serviceStartDateTime = setMinutes(setHours(targetDate, hours), mins);
+      const serviceEndDateTime = setMinutes(setHours(targetDate, serviceEnd[0]), serviceEnd[1]);
 
-      // Skip if today's service has already passed
-      if (i === 0 && !isAfter(serviceDateTime, now)) continue;
+      // If today and service end time has already passed, skip to next service day!
+      if (i === 0 && isAfter(now, serviceEndDateTime)) {
+        continue;
+      }
 
-      // For Sundays, get the dynamic service type
       const isSunday = dayOfWeek === 0;
       const { title, description } = isSunday
         ? getSundayServiceType(targetDate)
@@ -131,14 +132,36 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
 }
 
 /**
- * Returns merged upcoming events including both database custom programs and next weekly RCCG services
+ * Formats a clear, bullet-proof response for service schedule queries.
+ */
+export function getServiceScheduleInfo(): string {
+  const now = new Date();
+  const nextService = getNextUpcomingService();
+  const nextDateFormatted = nextService ? format(new Date(nextService.event_date), 'EEEE, MMMM d, yyyy') : '';
+
+  return (
+    `📅 *RCCG Everflourishing Mega Sanctuary — Service Schedule*:\n\n` +
+    `• *TUESDAY*: Digging Deep (Bible Study & Intercession) — *6:00 PM - 7:30 PM*\n` +
+    `• *THURSDAY*: Faith Clinic (Miracle Hour & Deliverance) — *6:00 PM - 7:00 PM*\n` +
+    `• *SUNDAY*: Sunday Celebration Service — *8:00 AM - 12:00 PM*\n\n` +
+    `📌 *Note*: There are *no church services scheduled on Wednesdays or Mondays*.\n\n` +
+    (nextService
+      ? `👉 *NEXT UPCOMING SERVICE*:\n` +
+        `• *${nextService.title}*\n` +
+        `• 📆 Date: *${nextDateFormatted}*\n` +
+        `• ⏰ Time: *${nextService.start_time} - ${nextService.end_time || ''}*\n` +
+        `• 📍 Location: *${nextService.location || 'Main Sanctuary'}*`
+      : '')
+  );
+}
+
+/**
+ * Returns merged upcoming events including database custom programs and weekly RCCG services
  */
 export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], daysAhead: number = 14): ChurchEvent[] {
   const now = new Date();
-
   const recurringEvents: ChurchEvent[] = [];
 
-  // Generate next occurrences of weekly services for the next N days
   for (let i = 0; i <= daysAhead; i++) {
     const targetDate = addDays(now, i);
     const dayOfWeek = targetDate.getDay();
@@ -146,12 +169,11 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
 
     WEEKLY_SERVICES.forEach((service) => {
       if (service.dayOfWeek === dayOfWeek) {
-        // If it's today, check if start_time has already passed
         const [hours, mins] = service.startTime.split(':').map(Number);
-        const serviceDateTime = setMinutes(setHours(targetDate, hours), mins);
+        const [endHours, endMins] = (service.endTime || '20:00').split(':').map(Number);
+        const serviceEndDateTime = setMinutes(setHours(targetDate, endHours), endMins);
 
-        if (isAfter(serviceDateTime, now) || isSameDay(targetDate, now)) {
-          // For Sundays, resolve dynamic service type
+        if (isAfter(serviceEndDateTime, now) || !isSameDay(targetDate, now)) {
           const isSunday = dayOfWeek === 0;
           const { title, description } = isSunday
             ? getSundayServiceType(targetDate)
@@ -173,10 +195,7 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
     });
   }
 
-  // Combine custom DB events and recurring weekly services
   const combined = [...customDbEvents];
-  
-  // Only add recurring service if there is no custom event on the exact same date with same/similar title
   recurringEvents.forEach((rec) => {
     const exists = combined.some((dbEv) => dbEv.event_date === rec.event_date);
     if (!exists) {
@@ -184,7 +203,6 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
     }
   });
 
-  // Sort chronologically by date and start_time
   combined.sort((a, b) => {
     const dateA = new Date(`${a.event_date}T${a.start_time || '00:00'}`).getTime();
     const dateB = new Date(`${b.event_date}T${b.start_time || '00:00'}`).getTime();
