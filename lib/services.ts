@@ -10,6 +10,8 @@ export interface ChurchEvent {
   description?: string;
   category?: 'recurring' | 'special';
   is_recurring?: boolean;
+  image_url?: string;
+  flyer_url?: string;
 }
 
 /**
@@ -135,7 +137,6 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
  * Formats a clear, bullet-proof response for service schedule queries.
  */
 export function getServiceScheduleInfo(): string {
-  const now = new Date();
   const nextService = getNextUpcomingService();
   const nextDateFormatted = nextService ? format(new Date(nextService.event_date), 'EEEE, MMMM d, yyyy') : '';
 
@@ -158,7 +159,7 @@ export function getServiceScheduleInfo(): string {
 /**
  * Returns merged upcoming events including database custom programs and weekly RCCG services
  */
-export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], daysAhead: number = 14): ChurchEvent[] {
+export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], daysAhead: number = 28): ChurchEvent[] {
   const now = new Date();
   const recurringEvents: ChurchEvent[] = [];
 
@@ -195,7 +196,17 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
     });
   }
 
-  const combined = [...customDbEvents];
+  const combined: ChurchEvent[] = [];
+
+  // 1. Add all custom events from database (which may override recurring defaults)
+  customDbEvents.forEach(dbEv => {
+    combined.push({
+      ...dbEv,
+      is_recurring: false,
+    });
+  });
+
+  // 2. Add recurring events if there is no custom event on the exact same date
   recurringEvents.forEach((rec) => {
     const exists = combined.some((dbEv) => dbEv.event_date === rec.event_date);
     if (!exists) {
@@ -203,6 +214,7 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
     }
   });
 
+  // Sort chronologically by date and start_time
   combined.sort((a, b) => {
     const dateA = new Date(`${a.event_date}T${a.start_time || '00:00'}`).getTime();
     const dateB = new Date(`${b.event_date}T${b.start_time || '00:00'}`).getTime();
