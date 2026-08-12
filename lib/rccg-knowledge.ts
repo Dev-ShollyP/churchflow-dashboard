@@ -1,5 +1,6 @@
 import hymnsData from './rccg-hymns.json';
 import historyData from './rccg-history.json';
+import { getServiceScheduleInfo } from './services';
 
 export interface Hymn {
   number: number;
@@ -15,7 +16,6 @@ export function searchHymn(query: string): Hymn | null {
   if (!query) return null;
   const clean = query.trim().toLowerCase();
 
-  // 1. Check for Hymn Number match (e.g., "hymn 1", "hymn #10", "100", "hymn no 12")
   const numMatch = clean.match(/hymn\s*(?:no\.?|#)?\s*(\d+)|^\s*(\d+)\s*$/i);
   if (numMatch) {
     const targetNum = parseInt(numMatch[1] || numMatch[2], 10);
@@ -23,13 +23,11 @@ export function searchHymn(query: string): Hymn | null {
     if (found) return found as Hymn;
   }
 
-  // 2. Exact or substring match on title
   const foundByTitle = hymnsData.find(h =>
     h.title.toLowerCase().includes(clean) || clean.includes(h.title.toLowerCase())
   );
   if (foundByTitle) return foundByTitle as Hymn;
 
-  // 3. Search verse content / lyrics if present
   const foundByVerses = hymnsData.find(h =>
     Array.isArray(h.verses) && (h.verses as string[]).some((v: string) => v.toLowerCase().includes(clean))
   );
@@ -58,8 +56,53 @@ export function formatHymnResponse(hymn: Hymn): string {
   return output;
 }
 
+/**
+ * Returns Google Maps Realtime Location & Directions info
+ */
+export function getChurchLocationAndDirections(userQuery: string = ''): string {
+  const clean = userQuery.toLowerCase();
+  let landmarkContext = '';
+
+  if (clean.includes('kola') || clean.includes('lagos') || clean.includes('abule egba')) {
+    landmarkContext =
+      `🚗 *Directions from Kola Bus Stop / Lagos*:\n` +
+      `1. Take a bus or taxi from Kola Bus Stop heading towards Ota / Sango-Ota.\n` +
+      `2. Alight at *Iyana Iyesi Bus Stop* (just after Moshalashi).\n` +
+      `3. From Iyana Iyesi B/Stop, walk down or take a short tricycle (keke) down *Powerline Street* to No. 7.\n` +
+      `⏱️ Estimated travel time: 25 - 40 mins depending on traffic.\n\n`;
+  } else if (clean.includes('sango') || clean.includes('abeokuta')) {
+    landmarkContext =
+      `🚗 *Directions from Sango / Abeokuta Road*:\n` +
+      `1. Take a bus or tricycle heading towards Iyana Iyesi / Toll Gate.\n` +
+      `2. Alight at *Moshalashi / Iyana Iyesi Bus Stop*.\n` +
+      `3. Turn into *Powerline Street* to arrive at RCCG Everflourishing Mega Sanctuary (No. 7).\n\n`;
+  }
+
+  return (
+    `📍 *RCCG Everflourishing Mega Sanctuary — Location & Directions*\n\n` +
+    `🏢 *Physical Address*:\n` +
+    `7, Powerline Street, Moshalashi Bus Stop, Iyana Iyesi, Ota, Ogun State, Nigeria.\n\n` +
+    landmarkContext +
+    `🗺️ *Realtime Google Maps Navigation*:\n` +
+    `• *Open Pin on Google Maps*:\nhttps://maps.google.com/?q=RCCG+Everflourishing+Mega+Sanctuary+Powerline+Street+Iyana+Iyesi+Ota\n\n` +
+    `🧭 *Live GPS Directions Link*:\n` +
+    `https://www.google.com/maps/dir/?api=1&destination=6.6961,3.2162&destination_place_id=RCCG+Everflourishing+Mega+Sanctuary\n\n` +
+    `God bless you as you come! We look forward to worshipping with you! 🙌`
+  );
+}
+
 export function getRCCGInfo(query: string): string | null {
   const clean = query.trim().toLowerCase();
+
+  // Location / Directions query
+  if (/location|address|where|direction|find|map|kola|iyana iyesi|moshalashi|powerline|get to church/i.test(clean)) {
+    return getChurchLocationAndDirections(query);
+  }
+
+  // Service Time / Schedule query
+  if (/service|time|digging deep|faith clinic|sunday|schedule|tomorrow|today|when|next service/i.test(clean)) {
+    return getServiceScheduleInfo();
+  }
 
   if (/structure|hierarchy|administrative|organisat|organizat|zone|province|parish/i.test(clean)) {
     return `🏛️ *RCCG Administrative Structure & Hierarchy*:\n\n` +
