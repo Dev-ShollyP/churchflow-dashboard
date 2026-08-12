@@ -57,36 +57,18 @@ export function formatHymnResponse(hymn: Hymn): string {
 }
 
 /**
- * Returns Google Maps Realtime Location & Directions info
+ * Returns Google Maps Realtime Location & Live Navigation Links
  */
 export function getChurchLocationAndDirections(userQuery: string = ''): string {
-  const clean = userQuery.toLowerCase();
-  let landmarkContext = '';
-
-  if (clean.includes('kola') || clean.includes('lagos') || clean.includes('abule egba')) {
-    landmarkContext =
-      `🚗 *Directions from Kola Bus Stop / Lagos*:\n` +
-      `1. Take a bus or taxi from Kola Bus Stop heading towards Ota / Sango-Ota.\n` +
-      `2. Alight at *Iyana Iyesi Bus Stop* (just after Moshalashi).\n` +
-      `3. From Iyana Iyesi B/Stop, walk down or take a short tricycle (keke) down *Powerline Street* to No. 7.\n` +
-      `⏱️ Estimated travel time: 25 - 40 mins depending on traffic.\n\n`;
-  } else if (clean.includes('sango') || clean.includes('abeokuta')) {
-    landmarkContext =
-      `🚗 *Directions from Sango / Abeokuta Road*:\n` +
-      `1. Take a bus or tricycle heading towards Iyana Iyesi / Toll Gate.\n` +
-      `2. Alight at *Moshalashi / Iyana Iyesi Bus Stop*.\n` +
-      `3. Turn into *Powerline Street* to arrive at RCCG Everflourishing Mega Sanctuary (No. 7).\n\n`;
-  }
-
   return (
-    `📍 *RCCG Everflourishing Mega Sanctuary — Location & Directions*\n\n` +
+    `📍 *RCCG Everflourishing Mega Sanctuary*\n\n` +
     `🏢 *Physical Address*:\n` +
-    `7, Powerline Street, Moshalashi Bus Stop, Iyana Iyesi, Ota, Ogun State, Nigeria.\n\n` +
-    landmarkContext +
-    `🗺️ *Realtime Google Maps Navigation*:\n` +
-    `• *Open Pin on Google Maps*:\nhttps://maps.google.com/?q=RCCG+Everflourishing+Mega+Sanctuary+Powerline+Street+Iyana+Iyesi+Ota\n\n` +
-    `🧭 *Live GPS Directions Link*:\n` +
-    `https://www.google.com/maps/dir/?api=1&destination=6.6961,3.2162&destination_place_id=RCCG+Everflourishing+Mega+Sanctuary\n\n` +
+    `No. 7, Powerline Street, Moshalashi Bus Stop, Iyana Iyesi, Ota, Ogun State, Nigeria.\n\n` +
+    `🗺️ *Live Google Maps Navigation*:\n` +
+    `Tap the link below to open Google Maps for real-time GPS turn-by-turn directions from your current location:\n\n` +
+    `👉 https://www.google.com/maps/dir/?api=1&destination=7+Powerline+Street+Moshalashi+Iyana+Iyesi+Ota\n\n` +
+    `📌 *Google Maps Location Pin*:\n` +
+    `https://maps.google.com/?q=RCCG+Everflourishing+Mega+Sanctuary+Powerline+Street+Iyana+Iyesi+Ota\n\n` +
     `God bless you as you come! We look forward to worshipping with you! 🙌`
   );
 }
@@ -94,8 +76,8 @@ export function getChurchLocationAndDirections(userQuery: string = ''): string {
 export function getRCCGInfo(query: string): string | null {
   const clean = query.trim().toLowerCase();
 
-  // Location / Directions query
-  if (/location|address|where|direction|find|map|kola|iyana iyesi|moshalashi|powerline|get to church/i.test(clean)) {
+  // Location / Directions query -> Google Maps
+  if (/location|address|where|direction|find|map|ojuore|kola|iyana iyesi|moshalashi|powerline|get to church|navigate|gps/i.test(clean)) {
     return getChurchLocationAndDirections(query);
   }
 
