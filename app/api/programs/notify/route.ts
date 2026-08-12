@@ -4,6 +4,54 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
+async function sendMetaTemplateDirect(
+  phoneNumberId: string,
+  whatsappToken: string,
+  formattedPhone: string,
+  templateName: string,
+  langCode: string,
+  parameters: string[]
+) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const components = parameters.length > 0
+      ? [
+          {
+            type: 'body',
+            parameters: parameters.map((val) => ({ type: 'text', text: val })),
+          },
+        ]
+      : [];
+
+    const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${whatsappToken}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: langCode },
+          components,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+    const data = await res.json();
+    return { ok: res.ok && !!data.messages, data };
+  } catch (err: any) {
+    return { ok: false, data: { error: { message: err.message } } };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -41,7 +89,17 @@ export async function POST(request: Request) {
       },
     });
 
+    const { data: session } = await supabase
+      .from('whatsapp_sessions')
+      .select('phone_number_id, access_token')
+      .limit(1)
+      .single();
+
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || session?.phone_number_id || '1252855381239526';
+    const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN || session?.access_token || 'EAGATFNQZCUQIBSEf9WbNE4la5u2lMVD0sPkfPUksFwtf7GiCAzUcx3pvl0rP2fwWf8xu2QJoJh0Ybuqx072cc0mUv0eLBFYS39WlxkmF8dTVOPJ4lwUTqOLzlWFTfCTgQZArkpI5tC3NWRZCGp0RW79px4olQuosTf88Ei2Lh3tZBGCpDFWar8X2ZA4I9aPQWagZDZD';
+
     let broadcastCount = 0;
+    let deliveredCount = 0;
 
     if (send_broadcast) {
       // 1. Fetch active church members for broadcast dispatch
@@ -69,7 +127,29 @@ export async function POST(request: Request) {
 
         await supabase.from('outbound_messages').insert(notifications).select();
 
-        // 3. Optional: Trigger n8n webhook if N8N_BROADCAST_WEBHOOK_URL is configured
+        // 3. Dispatch Meta Approved Template 'service_reminder' directly to all members (bypassing 24h window)
+        for (const member of members) {
+          const formattedPhone = (member.phone || '').replace(/\D/g, '');
+          if (!formattedPhone) continue;
+
+          // Template parameters: {{1}} = Service Title, {{2}} = Date & Time, {{3}} = Member Name
+          const params = [
+            title,
+            program_date || 'Upcoming Service',
+            member.full_name || 'Valued Member',
+          ];
+
+          let res = await sendMetaTemplateDirect(phoneNumberId, whatsappToken, formattedPhone, 'service_reminder', 'en', params);
+          if (!res.ok && res.data?.error?.code === 132001) {
+            res = await sendMetaTemplateDirect(phoneNumberId, whatsappToken, formattedPhone, 'service_reminder', 'en_US', params);
+          }
+
+          if (res.ok) {
+            deliveredCount++;
+          }
+        }
+
+        // 4. Trigger n8n webhook if N8N_BROADCAST_WEBHOOK_URL is configured
         const n8nWebhookUrl = process.env.N8N_BROADCAST_WEBHOOK_URL;
         if (n8nWebhookUrl) {
           try {
@@ -99,6 +179,7 @@ export async function POST(request: Request) {
       program_id,
       broadcast_triggered: send_broadcast,
       recipients_queued: broadcastCount,
+      templates_delivered_live: deliveredCount,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
