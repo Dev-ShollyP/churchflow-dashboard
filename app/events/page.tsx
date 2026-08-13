@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import DashboardShell from '@/components/DashboardShell';
-import { createClient, getCurrentStaff } from '@/lib/supabase';
+import { createClient, getCurrentStaff, getBranchId } from '@/lib/supabase';
 import EmptyState from '@/components/ui/EmptyState';
 import {
   Calendar, MapPin, Clock, Sparkles, Plus, Trash2, Edit3,
@@ -89,6 +89,8 @@ export default function EventsPage() {
   const [selectedFlyer, setSelectedFlyer] = useState<{ title: string; image_url: string; date?: string; scripture?: string } | null>(null);
 
   const [canWrite, setCanWrite] = useState(false);
+  const [branchId, setBranchId] = useState<string | null>(null);
+  const [currentStaffId, setCurrentStaffId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -100,7 +102,14 @@ export default function EventsPage() {
 
   useEffect(() => {
     loadEvents();
-    getCurrentStaff().then(s => { if (s) setCanWrite(true); });
+    getBranchId().then(b => { if (b) setBranchId(b); });
+    getCurrentStaff().then(s => {
+      if (s) {
+        setCanWrite(true);
+        setCurrentStaffId(s.id || s.email);
+        if (s.branch_id) setBranchId(s.branch_id);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -220,7 +229,25 @@ export default function EventsPage() {
         compositeDescription += `\n[SCRIPTURE:${eventForm.scripture.trim()}]`;
       }
 
-      // Base payload with standard columns guaranteed to exist
+      // Resolve non-null branch_id and created_by required by database constraints
+      let activeBranchId = branchId;
+      let activeStaffId = currentStaffId;
+
+      if (!activeBranchId || !activeStaffId) {
+        const { data: sess } = await supabase.from('whatsapp_sessions').select('branch_id').limit(1).single();
+        if (sess?.branch_id) activeBranchId = sess.branch_id;
+
+        const { data: staffRow } = await supabase.from('staff').select('id, branch_id').limit(1).single();
+        if (staffRow?.id) activeStaffId = staffRow.id;
+        if (!activeBranchId && staffRow?.branch_id) activeBranchId = staffRow.branch_id;
+      }
+
+      // Fallback valid UUID string if DB column requires UUID type
+      const fallbackUuid = '00000000-0000-0000-0000-000000000000';
+      const validBranchId = activeBranchId && activeBranchId.length > 5 ? activeBranchId : fallbackUuid;
+      const validCreatedBy = activeStaffId && activeStaffId.length > 5 ? activeStaffId : fallbackUuid;
+
+      // Base payload satisfying NOT NULL constraints (branch_id, created_by)
       const standardPayload: any = {
         title: eventForm.title.trim(),
         description: compositeDescription || null,
@@ -228,6 +255,8 @@ export default function EventsPage() {
         start_time: eventForm.start_time || '08:00',
         end_time: eventForm.end_time || '11:30',
         location: eventForm.location.trim() || 'Main Sanctuary',
+        branch_id: validBranchId,
+        created_by: validCreatedBy,
       };
 
       if (eventForm.id) {
@@ -238,7 +267,7 @@ export default function EventsPage() {
       const fullPayload = { ...standardPayload, image_url: uploadedImageUrl || null };
       let { error } = await supabase.from('events').upsert(fullPayload).select();
 
-      // 2. Fallback: If DB throws "schema cache" error for missing column, retry with standard payload
+      // 2. Fallback: If DB throws "schema cache" error for missing image_url column, retry with standard payload
       if (error && error.message.includes('schema cache')) {
         const fallbackRes = await supabase.from('events').upsert(standardPayload).select();
         error = fallbackRes.error;
