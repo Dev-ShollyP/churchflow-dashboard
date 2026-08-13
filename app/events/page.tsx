@@ -11,6 +11,8 @@ import {
 import { format, parseISO, addDays, isSameDay } from 'date-fns';
 import { getCombinedUpcomingEvents, ChurchEvent } from '@/lib/services';
 
+const DEFAULT_BRANCH_ID = '22222222-2222-2222-2222-222222222222';
+
 interface SpecialProgram {
   id: string;
   title: string;
@@ -90,7 +92,6 @@ export default function EventsPage() {
 
   const [canWrite, setCanWrite] = useState(false);
   const [branchId, setBranchId] = useState<string | null>(null);
-  const [currentStaffId, setCurrentStaffId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -106,7 +107,6 @@ export default function EventsPage() {
     getCurrentStaff().then(s => {
       if (s) {
         setCanWrite(true);
-        setCurrentStaffId(s.id || s.email);
         if (s.branch_id) setBranchId(s.branch_id);
       }
     });
@@ -123,10 +123,10 @@ export default function EventsPage() {
     const now = new Date();
     const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
-    // Select all available columns dynamically
+    // Query events with actual database columns (banner_url)
     const { data } = await supabase
       .from('events')
-      .select('*')
+      .select('id, branch_id, title, description, event_date, start_time, end_time, location, banner_url')
       .gte('event_date', localToday)
       .order('event_date', { ascending: true })
       .limit(50);
@@ -136,7 +136,7 @@ export default function EventsPage() {
       return {
         ...item,
         description: cleanDescription,
-        image_url: item.image_url || item.flyer_url || embeddedFlyer,
+        image_url: item.banner_url || item.image_url || item.flyer_url || embeddedFlyer,
         scripture: item.scripture || embeddedScripture,
       };
     });
@@ -181,6 +181,8 @@ export default function EventsPage() {
 
   function handleOpenEditEventModal(event: ChurchEvent) {
     const { cleanDescription, embeddedFlyer, embeddedScripture } = parseEventMeta(event.description);
+    const flyerUrl = (event as any).banner_url || event.image_url || event.flyer_url || embeddedFlyer || '';
+
     setEditingEvent(event);
     setEventForm({
       id: event.id.startsWith('recurring-') ? '' : event.id,
@@ -191,10 +193,10 @@ export default function EventsPage() {
       start_time: event.start_time || '08:00',
       end_time: event.end_time || '11:30',
       location: event.location || 'Main Sanctuary',
-      image_url: event.image_url || event.flyer_url || embeddedFlyer || '',
+      image_url: flyerUrl,
     });
     setEventImageFile(null);
-    setEventImagePreview(event.image_url || event.flyer_url || embeddedFlyer || null);
+    setEventImagePreview(flyerUrl || null);
     setShowEventModal(true);
   }
 
@@ -220,7 +222,7 @@ export default function EventsPage() {
         }
       }
 
-      // Encode flyer URL and scripture reference safely inside description to prevent schema errors
+      // Encode flyer URL and scripture reference safely inside description
       let compositeDescription = eventForm.description.trim();
       if (uploadedImageUrl) {
         compositeDescription += `\n[FLYER:${uploadedImageUrl}]`;
@@ -229,50 +231,30 @@ export default function EventsPage() {
         compositeDescription += `\n[SCRIPTURE:${eventForm.scripture.trim()}]`;
       }
 
-      // Resolve non-null branch_id and created_by required by database constraints
+      // Resolve valid branch_id (REQUIRED NOT NULL foreign key)
       let activeBranchId = branchId;
-      let activeStaffId = currentStaffId;
-
-      if (!activeBranchId || !activeStaffId) {
+      if (!activeBranchId) {
         const { data: sess } = await supabase.from('whatsapp_sessions').select('branch_id').limit(1).single();
-        if (sess?.branch_id) activeBranchId = sess.branch_id;
-
-        const { data: staffRow } = await supabase.from('staff').select('id, branch_id').limit(1).single();
-        if (staffRow?.id) activeStaffId = staffRow.id;
-        if (!activeBranchId && staffRow?.branch_id) activeBranchId = staffRow.branch_id;
+        activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
       }
 
-      // Fallback valid UUID string if DB column requires UUID type
-      const fallbackUuid = '00000000-0000-0000-0000-000000000000';
-      const validBranchId = activeBranchId && activeBranchId.length > 5 ? activeBranchId : fallbackUuid;
-      const validCreatedBy = activeStaffId && activeStaffId.length > 5 ? activeStaffId : fallbackUuid;
-
-      // Base payload satisfying NOT NULL constraints (branch_id, created_by)
-      const standardPayload: any = {
+      // Match actual Postgres schema columns (banner_url, branch_id)
+      const payload: any = {
+        branch_id: activeBranchId || DEFAULT_BRANCH_ID,
         title: eventForm.title.trim(),
         description: compositeDescription || null,
         event_date: eventForm.event_date,
         start_time: eventForm.start_time || '08:00',
         end_time: eventForm.end_time || '11:30',
         location: eventForm.location.trim() || 'Main Sanctuary',
-        branch_id: validBranchId,
-        created_by: validCreatedBy,
+        banner_url: uploadedImageUrl || null,
       };
 
       if (eventForm.id) {
-        standardPayload.id = eventForm.id;
+        payload.id = eventForm.id;
       }
 
-      // 1. First attempt: Try saving with image_url column if supported
-      const fullPayload = { ...standardPayload, image_url: uploadedImageUrl || null };
-      let { error } = await supabase.from('events').upsert(fullPayload).select();
-
-      // 2. Fallback: If DB throws "schema cache" error for missing image_url column, retry with standard payload
-      if (error && error.message.includes('schema cache')) {
-        const fallbackRes = await supabase.from('events').upsert(standardPayload).select();
-        error = fallbackRes.error;
-      }
-
+      const { error } = await supabase.from('events').upsert(payload).select();
       if (error) throw error;
 
       showToast('success', editingEvent ? 'Event updated with flyer design & scripture!' : 'Event created successfully!');
@@ -468,7 +450,7 @@ export default function EventsPage() {
                 const isToday = isSameDay(eventDateObj, new Date());
                 const { cleanDescription, embeddedFlyer, embeddedScripture } = parseEventMeta(event.description);
                 const scriptureText = (event as any).scripture || embeddedScripture;
-                const flyerSrc = event.image_url || event.flyer_url || embeddedFlyer || '';
+                const flyerSrc = (event as any).banner_url || event.image_url || event.flyer_url || embeddedFlyer || '';
                 const hasFlyer = !!flyerSrc;
 
                 return (
