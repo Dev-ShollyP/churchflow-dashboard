@@ -2,45 +2,68 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xzyrftzhaolovlbnpbpk.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eXJmdHpoYW9sb3ZsYm5wYnBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDIxNTQyOSwiZXhwIjoyMDU1NzkxNDI5fQ.12tIeRsm_Vj6bJb9WfT4-v-YJvhXwPZkI9R9rJ1f4Z4';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eXJmdHpoYW9sb3ZsYm5wYnBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDk4NDgsImV4cCI6MjEwMDEyNTg0OH0.EpHzchjPGnRoQgaY-zGF9GvyPNcR-JQt9kAL5zosT3I';
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export async function POST(req: NextRequest) {
+const DEFAULT_FLYER = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/First%20Service.jpg';
+
+export async function GET(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'Missing event ID' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const ext = file.name.split('.').pop() || 'png';
-    const fileName = `event_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-    const filePath = `EventFlyers/${fileName}`;
+    const { data: event, error } = await supabase
+      .from('events')
+      .select('banner_url, description, title')
+      .eq('id', id)
+      .single();
 
-    // Upload with admin service role key to bypass RLS policies
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('Flyers')
-      .upload(filePath, buffer, {
-        contentType: file.type || 'image/png',
-        upsert: true,
+    if (error || !event) {
+      return NextResponse.redirect(DEFAULT_FLYER);
+    }
+
+    let flyerSource = event.banner_url || '';
+
+    // If banner_url is empty, check embedded description metadata
+    if (!flyerSource && event.description) {
+      const match = event.description.match(/\[FLYER:\s*([^\]]+)\]/);
+      if (match) flyerSource = match[1].trim();
+    }
+
+    // Handle Base64 Data URL
+    if (flyerSource.startsWith('data:image/')) {
+      const parts = flyerSource.split(',');
+      const mime = parts[0].split(';')[0].split(':')[1] || 'image/png';
+      const base64Data = parts[1];
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      return new NextResponse(buffer, {
+        headers: {
+          'Content-Type': mime,
+          'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+        },
       });
-
-    if (uploadError) {
-      console.error('Server storage upload error:', uploadError);
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from('Flyers')
-      .getPublicUrl(filePath);
+    // Handle standard HTTPS flyer URL (must NOT be pointing back to /api/events/flyer)
+    if ((flyerSource.startsWith('http://') || flyerSource.startsWith('https://')) && flyerSource.indexOf('/api/events/flyer') === -1 && flyerSource.indexOf('/api/flyers') === -1) {
+      return NextResponse.redirect(flyerSource);
+    }
 
-    return NextResponse.json({ publicUrl: publicUrlData.publicUrl });
+    // Fallback default high-res service flyer
+    const titleLower = (event.title || '').toLowerCase();
+    if (titleLower.includes('thanksgiving')) return NextResponse.redirect('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/Thanks.jpg');
+    if (titleLower.includes('digging')) return NextResponse.redirect('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/Digging%20Deep.png');
+    if (titleLower.includes('faith')) return NextResponse.redirect('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/faith%20clinic.jpg');
+
+    return NextResponse.redirect(DEFAULT_FLYER);
   } catch (err: any) {
-    console.error('API event upload error:', err);
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    console.error('Flyer image serving error:', err);
+    return NextResponse.redirect(DEFAULT_FLYER);
   }
 }
