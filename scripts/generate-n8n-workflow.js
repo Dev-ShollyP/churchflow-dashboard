@@ -705,7 +705,6 @@ const lowerText = userText.toLowerCase();
 const buttonId = (parsed.button_id || '').trim();
 
 const storageBase = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';
-
 const CHURCH_ADDRESS = '7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State';
 
 // Complete Bible verse lookup dictionary
@@ -806,15 +805,13 @@ if (lowerText.indexOf('hymn') !== -1 || lowerText.indexOf('showers of blessing')
 const matchedDbEvent = findMatchingDbEvent(lowerText);
 if (matchedDbEvent) {
   const meta = parseMeta(matchedDbEvent.description);
-  
-  // Ensure valid HTTP flyer URL for WhatsApp (no empty or data: URLs)
-  let flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || '';
-  if (!flyer || flyer.indexOf('data:') === 0) {
-    const tLower = (matchedDbEvent.title || '').toLowerCase();
-    if (tLower.indexOf('thanksgiving') !== -1) flyer = storageBase + '/Service/Thanks.jpg';
-    else if (tLower.indexOf('digging') !== -1) flyer = storageBase + '/Service/Digging%20Deep.png';
-    else if (tLower.indexOf('faith') !== -1) flyer = storageBase + '/Service/faith%20clinic.jpg';
-    else flyer = storageBase + '/Service/First%20Service.jpg';
+
+  // Dynamic image serving URL from Next.js server route /api/flyers/[id]
+  let flyer = '';
+  if (matchedDbEvent.id && String(matchedDbEvent.id).indexOf('recurring-') !== 0) {
+    flyer = 'https://churchflow-dashboard.vercel.app/api/flyers/' + matchedDbEvent.id;
+  } else {
+    flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || storageBase + '/Service/First%20Service.jpg';
   }
 
   const rawScripture = meta.embeddedScripture || matchedDbEvent.scripture || '';
