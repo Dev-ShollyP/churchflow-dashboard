@@ -12,6 +12,7 @@ import { format, parseISO, addDays, isSameDay } from 'date-fns';
 import { getCombinedUpcomingEvents, ChurchEvent } from '@/lib/services';
 
 const DEFAULT_BRANCH_ID = '22222222-2222-2222-2222-222222222222';
+const STORAGE_BASE = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';
 
 interface SpecialProgram {
   id: string;
@@ -181,7 +182,16 @@ export default function EventsPage() {
 
   function handleOpenEditEventModal(event: ChurchEvent) {
     const { cleanDescription, embeddedFlyer, embeddedScripture } = parseEventMeta(event.description);
-    const flyerUrl = (event as any).banner_url || event.image_url || event.flyer_url || embeddedFlyer || '';
+    
+    // Default fallback flyer depending on title if none set
+    let flyerUrl = (event as any).banner_url || event.image_url || event.flyer_url || embeddedFlyer || '';
+    if (!flyerUrl) {
+      const titleLower = event.title.toLowerCase();
+      if (titleLower.includes('thanksgiving')) flyerUrl = STORAGE_BASE + '/Service/Thanks.jpg';
+      else if (titleLower.includes('digging')) flyerUrl = STORAGE_BASE + '/Service/Digging%20Deep.png';
+      else if (titleLower.includes('faith')) flyerUrl = STORAGE_BASE + '/Service/faith%20clinic.jpg';
+      else if (titleLower.includes('youth') || titleLower.includes('super sunday') || titleLower.includes('prayer sunday')) flyerUrl = STORAGE_BASE + '/Service/First%20Service.jpg';
+    }
 
     setEditingEvent(event);
     setEventForm({
