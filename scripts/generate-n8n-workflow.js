@@ -714,7 +714,7 @@ const BIBLE_VERSES = {
   'psalm 100:4': '"Enter into his gates with thanksgiving, and into his courts with praise: be thankful unto him, and bless his name." — Psalm 100:4',
   'jeremiah 33:3': '"Call unto me, and I will answer thee, and shew thee great and mighty things, which thou knowest not." — Jeremiah 33:3',
   '2 timothy 2:15': '"Study to shew thyself approved unto God, a workman that needeth not to be ashamed, rightly dividing the word of truth." — 2 Timothy 2:15',
-  'james 5:14-15': '"Is any sick among you? let him call for the elders of the church; and let them pray over him... And the prayer of faith shall save the sick." — James 5:14-15',
+  'james 5:14-15': '"Is any sick among you? let call for the elders of the church; and let them pray over him... And the prayer of faith shall save the sick." — James 5:14-15',
   'colossians 3:14': '"And above all these things put on charity, which is the bond of perfectness." — Colossians 3:14',
   '1 corinthians 10:16': '"The cup of blessing which we bless, is it not the communion of the blood of Christ? The bread which we break, is it not the communion of the body of Christ?" — 1 Corinthians 10:16'
 };
@@ -790,7 +790,67 @@ const specialPrograms = specialProgramItems
   .filter(function(p) { return p && p.id && p.title; })
   .sort(function(a, b) { return new Date(a.program_date || 0) - new Date(b.program_date || 0); });
 
-// 0. HYMN REQUEST MATCH
+// 0. MONTH QUERY MATCH (e.g. "october", "august", "september", etc.)
+const monthsList = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+let requestedMonth = '';
+for (var m = 0; m < monthsList.length; m++) {
+  if (lowerText.indexOf(monthsList[m]) !== -1) {
+    requestedMonth = monthsList[m];
+    break;
+  }
+}
+
+if (requestedMonth) {
+  const monthIdx = monthsList.indexOf(requestedMonth); // 0 = Jan, 9 = Oct
+  
+  // Filter special programs for requested month
+  const monthPrograms = specialPrograms.filter(function(p) {
+    if (!p.program_date) return false;
+    const pDate = new Date(p.program_date);
+    return pDate.getMonth() === monthIdx;
+  });
+
+  // Filter events for requested month
+  const monthEvents = dbEvents.filter(function(e) {
+    if (!e.event_date) return false;
+    const eDate = new Date(e.event_date);
+    return eDate.getMonth() === monthIdx;
+  });
+
+  const allMonthItems = [...monthPrograms, ...monthEvents];
+
+  if (allMonthItems.length > 0) {
+    const monthUpper = requestedMonth.toUpperCase();
+    const listLines = monthPrograms.map(function(p, idx) {
+      let line = \`🌟 *\${(p.title || '').toUpperCase()}*\`;
+      if (p.program_date) {
+        line += \`\\n• *Date*: \${fmtDateHuman(p.program_date)}\`;
+        if (p.end_date && p.end_date !== p.program_date) line += \` – \${fmtDateHuman(p.end_date)}\`;
+      }
+      line += \`\\n• *Location*: \${p.venue || 'Main Sanctuary'}\\n\${CHURCH_ADDRESS}\`;
+      if (p.description) line += \`\\n\\n\${p.description}\`;
+      return line;
+    }).concat(monthEvents.map(function(ev) {
+      const meta = parseMeta(ev.description);
+      let line = \`🔥 *\${(ev.title || '').toUpperCase()}*\`;
+      if (ev.event_date) line += \`\\n• *Date*: \${fmtDateHuman(ev.event_date)}\`;
+      if (ev.start_time) line += \`\\n• *Time*: \${fmtTimeHuman(ev.start_time)} – \${fmtTimeHuman(ev.end_time || '12:00')}\`;
+      line += \`\\n• *Location*: \${ev.location || 'Main Sanctuary'}\\n\${CHURCH_ADDRESS}\`;
+      if (meta.cleanDesc) line += \`\\n\\n\${meta.cleanDesc}\`;
+      return line;
+    })).join('\\n\\n');
+
+    const replyText = \`🌟 *PROGRAMS & EVENTS FOR \${monthUpper} 2026* 🌟\\n\\n\${listLines}\\n\\nWe look forward to worshipping with you! 🙏\`;
+    const firstFlyer = (monthPrograms[0]?.flyer_url || monthPrograms[0]?.image_url || monthEvents[0]?.banner_url || storageBase + '/Service/First%20Service.jpg');
+
+    return [{ json: { is_direct: true, is_interactive: false, image_url: firstFlyer, direct_reply: replyText } }];
+  } else {
+    const replyText = \`🌟 *PROGRAMS & EVENTS FOR \${requestedMonth.toUpperCase()} 2026* 🌟\\n\\nThere are currently no special programs or events scheduled for \${requestedMonth.charAt(0).toUpperCase() + requestedMonth.slice(1)}. Check back soon as new events are added regularly! 🙏\`;
+    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: replyText } }];
+  }
+}
+
+// 0b. HYMN REQUEST MATCH
 if (lowerText.indexOf('hymn') !== -1 || lowerText.indexOf('showers of blessing') !== -1 || lowerText.indexOf('blessed assurance') !== -1 || lowerText.indexOf('all hail') !== -1) {
   let replyText = '';
   if (lowerText.indexOf('showers of blessing') !== -1 || lowerText.indexOf('235') !== -1) {
@@ -808,7 +868,7 @@ if (matchedDbEvent) {
 
   let flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || storageBase + '/Service/First%20Service.jpg';
   // Ensure valid HTTP flyer URL
-  if (!flyer || flyer.indexOf('http') !== 0) {
+  if (!flyer || (flyer.indexOf('http') !== 0 && flyer.indexOf('data:image/') !== 0)) {
     flyer = storageBase + '/Service/First%20Service.jpg';
   }
 
@@ -977,7 +1037,15 @@ const knowledgeBlock = articles
   .map(function(a) { return '### ' + a.title + '\\n' + a.markdown; })
   .join('\\n\\n');
 
-const systemPrompt = \`You are EVF Bot, the official automated WhatsApp AI assistant for RCCG Everflourishing Mega Sanctuary (Ogun 27 Ota).\\n\\nCURRENT DATE & TIME (WAT): \${watTime}\\n\\nKnowledge base:\\n\${knowledgeBlock}\\n\\nInstructions:\\n- Never generate or hallucinate fake lyrics for hymns or songs. Always instruct users to check churchflow-dashboard.vercel.app/hymns.\\n- Answer user questions directly with exact dates.\\n- Keep replies concise and complete.\`;
+const eventsBlock = dbEvents
+  .map(function(e) { return '- Event: ' + e.title + ' | Date: ' + (e.event_date || '') + ' | Time: ' + (e.start_time || '') + ' | Location: ' + (e.location || 'Main Sanctuary') + ' | Description: ' + (e.description || ''); })
+  .join('\\n');
+
+const specialProgramsBlock = specialPrograms
+  .map(function(p) { return '- Special Program: ' + p.title + ' | Date: ' + (p.program_date || '') + (p.end_date ? ' to ' + p.end_date : '') + ' | Venue: ' + (p.venue || 'Main Sanctuary') + ' | Description: ' + (p.description || ''); })
+  .join('\\n');
+
+const systemPrompt = \`You are EVF Bot, the official automated WhatsApp AI assistant for RCCG Everflourishing Mega Sanctuary (Ogun 27 Ota).\\n\\nCURRENT DATE & TIME (WAT): \${watTime}\\n\\nCHURCH ADDRESS:\\n\${CHURCH_ADDRESS}\\n\\nSPECIAL PROGRAMS SCHEDULED IN DATABASE:\\n\${specialProgramsBlock || 'None'}\\n\\nREGULAR EVENTS SCHEDULED IN DATABASE:\\n\${eventsBlock || 'None'}\\n\\nKNOWLEDGE BASE ARTICLES:\\n\${knowledgeBlock}\\n\\nInstructions:\\n- When asked about events in October or any month, check the Special Programs and Regular Events scheduled above and report exact details.\\n- Never say you lack information for October if Choir Concert 4.0 or any other event is listed above.\\n- Keep replies polite, concise, and complete with exact dates.\`;
 
 return [{
   json: {
