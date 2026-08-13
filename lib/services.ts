@@ -1,5 +1,7 @@
 import { addDays, format, isAfter, isSameDay, setHours, setMinutes, getDate, getDay } from 'date-fns';
 
+const STORAGE_BASE = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';
+
 export interface ChurchEvent {
   id: string;
   title: string;
@@ -12,12 +14,13 @@ export interface ChurchEvent {
   is_recurring?: boolean;
   image_url?: string;
   flyer_url?: string;
+  scripture?: string;
 }
 
 /**
- * Determines the RCCG Sunday service type by week-of-month.
+ * Determines the RCCG Sunday service type by week-of-month and assigns default flyer.
  */
-function getSundayServiceType(date: Date): { title: string; description: string } {
+function getSundayServiceType(date: Date): { title: string; description: string; flyerUrl: string } {
   const dayOfMonth = getDate(date); // 1–31
   const weekOfMonth = Math.ceil(dayOfMonth / 7); // 1–5
 
@@ -26,27 +29,32 @@ function getSundayServiceType(date: Date): { title: string; description: string 
       return {
         title: '1st Sunday — Thanksgiving Service',
         description: 'Glorious Celebration: Praise, Worship & Thanksgiving Offering',
+        flyerUrl: STORAGE_BASE + '/Service/Thanks.jpg',
       };
     case 2:
       return {
         title: '2nd Sunday — Prayer Sunday',
         description: 'Glorious Celebration: Corporate Intercessory Prayer & Word Service',
+        flyerUrl: STORAGE_BASE + '/Service/Second%20Servivce.jpg',
       };
     case 3:
       return {
         title: '3rd Sunday — Youth Sunday',
         description: 'Glorious Celebration: Youth-Led Praise, Worship & Word Service',
+        flyerUrl: STORAGE_BASE + '/Service/First%20Service.jpg',
       };
     case 4:
       return {
         title: '4th Sunday — Super Sunday (Relationship Sunday)',
         description: 'Glorious Celebration: Marriage, Family & Relationship Ministry Service',
+        flyerUrl: STORAGE_BASE + '/Service/First%20Service.jpg',
       };
     case 5:
     default:
       return {
         title: '5th Sunday — CSR / Welfare Sunday',
         description: 'Glorious Celebration: Community Service & Welfare Outreach Service',
+        flyerUrl: STORAGE_BASE + '/Service/First%20Service.jpg',
       };
   }
 }
@@ -60,6 +68,7 @@ export const WEEKLY_SERVICES = [
     endTime: '19:30',
     location: 'Main Sanctuary',
     description: 'Bilingual Word Study & Spiritual Growth Service',
+    flyerUrl: STORAGE_BASE + '/Service/Digging%20Deep.png',
   },
   {
     dayOfWeek: 4, // Thursday
@@ -69,6 +78,7 @@ export const WEEKLY_SERVICES = [
     endTime: '19:00',
     location: 'Main Sanctuary',
     description: 'Intercession, Divine Healing & Deliverance Service',
+    flyerUrl: STORAGE_BASE + '/Service/faith%20clinic.jpg',
   },
   {
     dayOfWeek: 0, // Sunday
@@ -78,12 +88,12 @@ export const WEEKLY_SERVICES = [
     endTime: '12:00',
     location: 'Main Sanctuary',
     description: 'Worship, Word & Breakthrough Session',
+    flyerUrl: STORAGE_BASE + '/Service/First%20Service.jpg',
   },
 ];
 
 /**
- * Returns the single next upcoming service from today onward (first match within 14 days).
- * Takes exact time into account: if today is service day but start time has passed, jumps to NEXT service day.
+ * Returns the single next upcoming service from today onward.
  */
 export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): ChurchEvent | null {
   const now = new Date();
@@ -106,15 +116,14 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
       const serviceStartDateTime = setMinutes(setHours(targetDate, hours), mins);
       const serviceEndDateTime = setMinutes(setHours(targetDate, serviceEnd[0]), serviceEnd[1]);
 
-      // If today and service end time has already passed, skip to next service day!
       if (i === 0 && isAfter(now, serviceEndDateTime)) {
         continue;
       }
 
       const isSunday = dayOfWeek === 0;
-      const { title, description } = isSunday
+      const { title, description, flyerUrl } = isSunday
         ? getSundayServiceType(targetDate)
-        : { title: service.title, description: service.description };
+        : { title: service.title, description: service.description, flyerUrl: service.flyerUrl };
 
       return {
         id: `recurring-${title.toLowerCase().replace(/\s+/g, '-')}-${dateStr}`,
@@ -124,6 +133,8 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
         end_time: service.endTime,
         location: service.location,
         description,
+        image_url: flyerUrl,
+        flyer_url: flyerUrl,
         category: 'recurring',
         is_recurring: true,
       };
@@ -134,7 +145,7 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
 }
 
 /**
- * Formats a clear, bullet-proof response for service schedule queries.
+ * Formats a clear response for service schedule queries.
  */
 export function getServiceScheduleInfo(): string {
   const nextService = getNextUpcomingService();
@@ -176,9 +187,9 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
 
         if (isAfter(serviceEndDateTime, now) || !isSameDay(targetDate, now)) {
           const isSunday = dayOfWeek === 0;
-          const { title, description } = isSunday
+          const { title, description, flyerUrl } = isSunday
             ? getSundayServiceType(targetDate)
-            : { title: service.title, description: service.description };
+            : { title: service.title, description: service.description, flyerUrl: service.flyerUrl };
 
           recurringEvents.push({
             id: `recurring-${title.toLowerCase().replace(/\s+/g, '-')}-${dateStr}`,
@@ -188,6 +199,8 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
             end_time: service.endTime,
             location: service.location,
             description,
+            image_url: flyerUrl,
+            flyer_url: flyerUrl,
             category: 'recurring',
             is_recurring: true,
           });
@@ -198,7 +211,7 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
 
   const combined: ChurchEvent[] = [];
 
-  // 1. Add all custom events from database (which may override recurring defaults)
+  // 1. Add all custom events from database
   customDbEvents.forEach(dbEv => {
     combined.push({
       ...dbEv,
