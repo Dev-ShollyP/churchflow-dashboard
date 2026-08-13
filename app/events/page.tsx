@@ -219,27 +219,17 @@ export default function EventsPage() {
 
       if (eventImageFile) {
         try {
-          const ext = eventImageFile.name.split('.').pop();
-          const fileName = `event_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-          const filePath = `EventFlyers/${fileName}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('Flyers')
-            .upload(filePath, eventImageFile, { upsert: true });
-
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage.from('Flyers').getPublicUrl(filePath);
-            uploadedImageUrl = urlData.publicUrl;
+          const apiFormData = new FormData();
+          apiFormData.append('file', eventImageFile);
+          const res = await fetch('/api/events/upload', { method: 'POST', body: apiFormData });
+          const json = await res.json();
+          if (json.publicUrl) {
+            uploadedImageUrl = json.publicUrl;
           } else {
-            console.warn('Supabase storage blocked upload due to RLS, converting to Data URL fallback:', uploadError);
-            uploadedImageUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e) => resolve(e.target?.result as string);
-              reader.readAsDataURL(eventImageFile);
-            });
+            console.warn('API upload error fallback:', json.error);
           }
         } catch (e) {
-          console.error('File reading error:', e);
+          console.error('File upload error:', e);
         }
       }
 
