@@ -274,7 +274,7 @@ export default function OverviewPage() {
                     </p>
                     {data.nextService.description && (
                       <p className="text-xs text-white/55 mt-1 leading-relaxed">
-                        {data.nextService.description}
+                        {data.nextService.description.replace(/\[FLYER:\s*[^\]]+\]/gi, '').replace(/\[SCRIPTURE:\s*[^\]]+\]/gi, '').trim()}
                       </p>
                     )}
                     <div className="flex items-center gap-3 mt-3 flex-wrap">
