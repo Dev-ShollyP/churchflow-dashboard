@@ -53,13 +53,13 @@ function parseEventMeta(rawDescription?: string | null): { cleanDescription: str
   const flyerMatch = cleanDescription.match(/\[FLYER:\s*([^\]]+)\]/);
   if (flyerMatch) {
     embeddedFlyer = flyerMatch[1].trim();
-    cleanDescription = cleanDescription.replace(/\[FLYER:\s*[^\]]+\]/g, '').trim();
+    cleanDescription = cleanDescription.replace(/\[FLYER:\s*[^\]]+\\]/g, '').trim();
   }
 
   const scriptMatch = cleanDescription.match(/\[SCRIPTURE:\s*([^\]]+)\]/);
   if (scriptMatch) {
     embeddedScripture = scriptMatch[1].trim();
-    cleanDescription = cleanDescription.replace(/\[SCRIPTURE:\s*[^\]]+\]/g, '').trim();
+    cleanDescription = cleanDescription.replace(/\[SCRIPTURE:\s*[^\]]+\\]/g, '').trim();
   }
 
   return { cleanDescription, embeddedFlyer, embeddedScripture };
@@ -218,17 +218,28 @@ export default function EventsPage() {
       let uploadedImageUrl = eventForm.image_url;
 
       if (eventImageFile) {
-        const ext = eventImageFile.name.split('.').pop();
-        const fileName = `event_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-        const filePath = `EventFlyers/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('Flyers')
-          .upload(filePath, eventImageFile, { upsert: true });
+        try {
+          const ext = eventImageFile.name.split('.').pop();
+          const fileName = `event_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+          const filePath = `EventFlyers/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('Flyers')
+            .upload(filePath, eventImageFile, { upsert: true });
 
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('Flyers').getPublicUrl(filePath);
-          uploadedImageUrl = urlData.publicUrl;
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from('Flyers').getPublicUrl(filePath);
+            uploadedImageUrl = urlData.publicUrl;
+          } else {
+            console.warn('Supabase storage blocked upload due to RLS, converting to Data URL fallback:', uploadError);
+            uploadedImageUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.readAsDataURL(eventImageFile);
+            });
+          }
+        } catch (e) {
+          console.error('File reading error:', e);
         }
       }
 
@@ -310,6 +321,12 @@ export default function EventsPage() {
         if (!uploadError) {
           const { data: urlData } = supabase.storage.from('Flyers').getPublicUrl(filePath);
           uploadedImageUrl = urlData.publicUrl;
+        } else {
+          uploadedImageUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.readAsDataURL(imageFile);
+          });
         }
       } catch {}
     }
