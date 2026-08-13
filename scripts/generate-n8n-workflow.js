@@ -806,10 +806,10 @@ const matchedDbEvent = findMatchingDbEvent(lowerText);
 if (matchedDbEvent) {
   const meta = parseMeta(matchedDbEvent.description);
 
-  // Dynamic image serving URL from Next.js server route /api/flyers/[id]
+  // Dynamic image serving URL from Next.js server route /api/flyers?id=
   let flyer = '';
   if (matchedDbEvent.id && String(matchedDbEvent.id).indexOf('recurring-') !== 0) {
-    flyer = 'https://churchflow-dashboard.vercel.app/api/flyers/' + matchedDbEvent.id;
+    flyer = 'https://churchflow-dashboard.vercel.app/api/events/flyer?id=' + matchedDbEvent.id;
   } else {
     flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || storageBase + '/Service/First%20Service.jpg';
   }
@@ -1128,7 +1128,7 @@ return [{
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ conversation_id: $(\"Resolve conversation_id\").first().json.conversation_id, sender: \"assistant\", message: ($json.reply || $json.message || \"Thank you for reaching out to RCCG EVF Sanctuary!\") }) }}",
+        "jsonBody": "={{ JSON.stringify({ conversation_id: $(\"Resolve conversation_id\").first().json.conversation_id, sender: \"assistant\", message: ($json.reply || $json.message || \"Thank you for reaching out to RCCG Everflourishing Mega Sanctuary!\") }) }}",
         "options": {}
       },
       "id": "48b6cc1a-04a7-43de-8ce1-69cedfeec01d",
