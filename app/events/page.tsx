@@ -53,13 +53,13 @@ function parseEventMeta(rawDescription?: string | null): { cleanDescription: str
   const flyerMatch = cleanDescription.match(/\[FLYER:\s*([^\]]+)\]/);
   if (flyerMatch) {
     embeddedFlyer = flyerMatch[1].trim();
-    cleanDescription = cleanDescription.replace(/\[FLYER:\s*[^\]]+\\]/g, '').trim();
+    cleanDescription = cleanDescription.replace(/\[FLYER:\s*[^\]]+\]/g, '').trim();
   }
 
   const scriptMatch = cleanDescription.match(/\[SCRIPTURE:\s*([^\]]+)\]/);
   if (scriptMatch) {
     embeddedScripture = scriptMatch[1].trim();
-    cleanDescription = cleanDescription.replace(/\[SCRIPTURE:\s*[^\]]+\\]/g, '').trim();
+    cleanDescription = cleanDescription.replace(/\[SCRIPTURE:\s*[^\]]+\]/g, '').trim();
   }
 
   return { cleanDescription, embeddedFlyer, embeddedScripture };
