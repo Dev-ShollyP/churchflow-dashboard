@@ -142,6 +142,113 @@ const workflow = {
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/processed_messages?on_conflict=wa_message_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { wa_message_id: $json.wa_message_id } }}",
+        "options": {}
+      },
+      "id": "2f4c91dc-764e-443b-9c7f-664143d96776",
+      "name": "Claim Message ID (Dedup)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 6688, 3408 ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$(\"Parse Incoming Message\").first().json.wa_message_id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "13d3c3cf-95cf-41f7-bb48-b0b3a57a23d9",
+      "name": "New Message? (not duplicate)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [ 6912, 3408 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $('Parse Incoming Message').first().json.phone_number_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', status: 'read', message_id: $json.wa_message_id, typing_indicator: { type: 'text' } } }}",
+        "options": {}
+      },
+      "id": "9d091e36-f2f1-4c2d-99b6-3eccfb64cee6",
+      "name": "Send Typing Indicator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 7136, 3408 ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Parse Incoming Message').first().json }];"
+      },
+      "id": "c1bbd58d-81f8-4484-8e8a-cb353ed050a5",
+      "name": "Restore Parsed Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 7360, 3408 ]
+    },
+    {
+      "parameters": {
         "url": "={{$vars.SUPABASE_URL}}/rest/v1/whatsapp_sessions",
         "sendQuery": true,
         "queryParameters": {
@@ -539,6 +646,52 @@ const workflow = {
     },
     {
       "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/special_programs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "branch_id",
+              "value": "=eq.{{$(\"Extract branch_id\").first().json.branch_id}}"
+            },
+            {
+              "name": "is_active",
+              "value": "eq.true"
+            },
+            {
+              "name": "order",
+              "value": "program_date.asc"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d378aa6d-9d65-45e0-8dc9-6a24771ec1ac",
+      "name": "Fetch Special Programs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 10048, 3408 ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
         "jsCode": `const settingsItems = $("Get Branch Settings").all();
 const settings = settingsItems.length ? settingsItems[0].json : {};
 const promptItems = $("Get Active AI Prompt").all();
@@ -552,8 +705,53 @@ const lowerText = userText.toLowerCase();
 const buttonId = (parsed.button_id || '').trim();
 
 const storageBase = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';
-const reminderPrompt = '';
-const thanksgivingFlyer = storageBase + '/Service/Thanks.jpg';
+
+const CHURCH_ADDRESS = '7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State';
+
+// Complete Bible verse lookup dictionary
+const BIBLE_VERSES = {
+  'mark 11:23': '"For verily I say unto you, That whosoever shall say unto this mountain, Be thou removed, and be thou cast into the sea; and shall not doubt in his heart, but shall believe that those things which he saith shall come to pass; he shall have whatsoever he saith." — Mark 11:23',
+  '1 timothy 4:12': '"Let no man despise thy youth; but be thou an example of the believers, in word, in conversation, in charity, in spirit, in faith, in purity." — 1 Timothy 4:12',
+  'psalm 100:4': '"Enter into his gates with thanksgiving, and into his courts with praise: be thankful unto him, and bless his name." — Psalm 100:4',
+  'jeremiah 33:3': '"Call unto me, and I will answer thee, and shew thee great and mighty things, which thou knowest not." — Jeremiah 33:3',
+  '2 timothy 2:15': '"Study to shew thyself approved unto God, a workman that needeth not to be ashamed, rightly dividing the word of truth." — 2 Timothy 2:15',
+  'james 5:14-15': '"Is any sick among you? let him call for the elders of the church; and let them pray over him... And the prayer of faith shall save the sick." — James 5:14-15',
+  'colossians 3:14': '"And above all these things put on charity, which is the bond of perfectness." — Colossians 3:14',
+  '1 corinthians 10:16': '"The cup of blessing which we bless, is it not the communion of the blood of Christ? The bread which we break, is it not the communion of the body of Christ?" — 1 Corinthians 10:16'
+};
+
+function quoteScripture(ref) {
+  if (!ref) return '';
+  const key = ref.toLowerCase().trim();
+  if (BIBLE_VERSES[key]) return BIBLE_VERSES[key];
+  for (var k in BIBLE_VERSES) {
+    if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return BIBLE_VERSES[k];
+  }
+  return '"' + ref + '"';
+}
+
+function fmtDateHuman(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr + 'T00:00:00+01:00');
+    return d.toLocaleDateString('en-US', { timeZone: 'Africa/Lagos', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function fmtTimeHuman(t) {
+  if (!t) return '';
+  if (t.indexOf(':') !== -1) {
+    const parts = t.split(':');
+    let h = parseInt(parts[0], 10);
+    const m = parts[1] || '00';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m + ' ' + ampm;
+  }
+  return t;
+}
 
 // Dynamic Events fetched from Supabase Database (Dashboard Managed)
 const dbEventsItems = $("Fetch Events").all();
@@ -571,14 +769,12 @@ function parseMeta(desc) {
   return { cleanDesc, embeddedFlyer, embeddedScripture };
 }
 
-// Find if any custom event in DB matches user search terms or upcoming service names
 function findMatchingDbEvent(queryLower) {
   for (var i = 0; i < dbEvents.length; i++) {
     const ev = dbEvents[i];
     const t = (ev.title || '').toLowerCase();
     if (!t) continue;
     if (queryLower.indexOf(t) !== -1 || t.indexOf(queryLower) !== -1) return ev;
-    // Check key event nicknames
     if (queryLower.indexOf('youth') !== -1 && t.indexOf('youth') !== -1) return ev;
     if (queryLower.indexOf('digging') !== -1 && (t.indexOf('digging') !== -1 || t.indexOf('bible study') !== -1)) return ev;
     if (queryLower.indexOf('faith clinic') !== -1 && (t.indexOf('faith clinic') !== -1 || t.indexOf('miracle hour') !== -1)) return ev;
@@ -595,28 +791,6 @@ const specialPrograms = specialProgramItems
   .filter(function(p) { return p && p.id && p.title; })
   .sort(function(a, b) { return new Date(a.program_date || 0) - new Date(b.program_date || 0); });
 
-function formatProgramDateRange(program) {
-  if (!program.program_date) return '';
-  const opts = { timeZone: 'Africa/Lagos', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  const start = new Date(program.program_date + 'T00:00:00+01:00').toLocaleDateString('en-US', opts);
-  if (program.end_date && program.end_date !== program.program_date) {
-    const end = new Date(program.end_date + 'T00:00:00+01:00').toLocaleDateString('en-US', opts);
-    return \`\${start} – \${end}\`;
-  }
-  return start;
-}
-
-const today = new Date();
-const currentDay = today.getDay();
-const daysUntilSunday = (7 - currentDay) % 7;
-const nextSunday = new Date(today);
-nextSunday.setDate(today.getDate() + (daysUntilSunday === 0 && today.getHours() >= 13 ? 7 : daysUntilSunday));
-
-const dayOfMonth = nextSunday.getDate();
-const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const monthName = monthNames[nextSunday.getMonth()];
-const year = nextSunday.getFullYear();
-
 // 0. HYMN REQUEST MATCH
 if (lowerText.indexOf('hymn') !== -1 || lowerText.indexOf('showers of blessing') !== -1 || lowerText.indexOf('blessed assurance') !== -1 || lowerText.indexOf('all hail') !== -1) {
   let replyText = '';
@@ -632,15 +806,32 @@ if (lowerText.indexOf('hymn') !== -1 || lowerText.indexOf('showers of blessing')
 const matchedDbEvent = findMatchingDbEvent(lowerText);
 if (matchedDbEvent) {
   const meta = parseMeta(matchedDbEvent.description);
-  const flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || storageBase + '/Service/First%20Service.jpg';
-  const scriptureText = meta.embeddedScripture || matchedDbEvent.scripture || '';
-  let replyText = \`🔥 *\${(matchedDbEvent.title || '').toUpperCase()}*\\n\\n• *Date*: *\${matchedDbEvent.event_date || ''}*\\n• *Time*: *\${matchedDbEvent.start_time || '08:00'} – \${matchedDbEvent.end_time || '11:30'}*\\n📍 *Location*: *\${matchedDbEvent.location || 'Main Sanctuary'}*\`;
+  
+  // Ensure valid HTTP flyer URL for WhatsApp (no empty or data: URLs)
+  let flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || '';
+  if (!flyer || flyer.indexOf('data:') === 0) {
+    const tLower = (matchedDbEvent.title || '').toLowerCase();
+    if (tLower.indexOf('thanksgiving') !== -1) flyer = storageBase + '/Service/Thanks.jpg';
+    else if (tLower.indexOf('digging') !== -1) flyer = storageBase + '/Service/Digging%20Deep.png';
+    else if (tLower.indexOf('faith') !== -1) flyer = storageBase + '/Service/faith%20clinic.jpg';
+    else flyer = storageBase + '/Service/First%20Service.jpg';
+  }
+
+  const rawScripture = meta.embeddedScripture || matchedDbEvent.scripture || '';
+  const fullVerseQuote = rawScripture ? quoteScripture(rawScripture) : '';
+  const dateFormatted = fmtDateHuman(matchedDbEvent.event_date);
+  const startTimeFmt = fmtTimeHuman(matchedDbEvent.start_time || '08:00');
+  const endTimeFmt = fmtTimeHuman(matchedDbEvent.end_time || '12:00');
+  const locName = matchedDbEvent.location || 'Main Sanctuary';
+
+  let replyText = \`🔥 *\${(matchedDbEvent.title || '').toUpperCase()}*\\n\\n• *Date*: *\${dateFormatted}*\\n• *Time*: *\${startTimeFmt} – \${endTimeFmt}*\\n📍 *Location*: *\${locName}*\\n\${CHURCH_ADDRESS}\`;
   if (meta.cleanDesc) replyText += \`\\n\\n\${meta.cleanDesc}\`;
-  if (scriptureText) replyText += \`\\n\\n📖 *Verse*: "\${scriptureText}"\`;
+  if (fullVerseQuote) replyText += \`\\n\\n📖 *Verse*: \${fullVerseQuote}\`;
+
   return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: replyText } }];
 }
 
-// 2. INDIVIDUAL SPECIAL PROGRAM MATCH (pulled from Supabase, dashboard-managed)
+// 2. INDIVIDUAL SPECIAL PROGRAM MATCH
 function matchesSpecialProgram(program) {
   if (buttonId === 'btn_program_' + program.id) return true;
   const t = (program.title || '').toLowerCase();
@@ -656,14 +847,19 @@ function matchesSpecialProgram(program) {
 for (var p = 0; p < specialPrograms.length; p++) {
   const program = specialPrograms[p];
   if (matchesSpecialProgram(program)) {
-    const dateRange = formatProgramDateRange(program);
+    let dateRange = '';
+    if (program.program_date) {
+      dateRange = fmtDateHuman(program.program_date);
+      if (program.end_date && program.end_date !== program.program_date) {
+        dateRange += ' – ' + fmtDateHuman(program.end_date);
+      }
+    }
     const lines = [\`🌟 *\${(program.title || '').toUpperCase()}* 🌟\`];
     if (dateRange) lines.push(\`• 🗓️ *Date*: *\${dateRange}*\`);
-    if (program.venue) lines.push(\`• 📍 *Venue*: *\${program.venue}*\`);
+    lines.push(\`• 📍 *Location*: *\${program.venue || 'Main Sanctuary'}*\\n\${CHURCH_ADDRESS}\`);
     let replyText = lines.join('\\n');
     if (program.description) replyText += \`\\n\\n\${program.description}\`;
-    replyText += reminderPrompt;
-    const flyer = program.flyer_url || program.image_url || '';
+    const flyer = program.flyer_url || program.image_url || storageBase + '/Service/First%20Service.jpg';
     return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: replyText } }];
   }
 }
@@ -677,20 +873,19 @@ if (buttonId === 'btn_events' || lowerText.indexOf('special program') !== -1 || 
   const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
   const listLines = specialPrograms.map(function(program, idx) {
     const num = numberEmojis[idx] || (idx + 1) + '.';
-    const dateRange = formatProgramDateRange(program);
     let line = \`\${num} 🌟 *\${program.title}*\`;
-    if (dateRange) line += \`\\n• *Date*: \${dateRange}\`;
-    if (program.venue) line += \`\\n• *Venue*: \${program.venue}\`;
+    if (program.program_date) line += \`\\n• *Date*: \${fmtDateHuman(program.program_date)}\`;
+    line += \`\\n• *Location*: \${program.venue || 'Main Sanctuary'}\\n\${CHURCH_ADDRESS}\`;
     return line;
   }).join('\\n\\n');
   const replyText = \`🌟 *UPCOMING SPECIAL PROGRAMS & EVENTS* 🌟\\n\\n\${listLines}\\n\\nReply with the program name to get full details and flyer for each event!\`;
-  const firstFlyer = specialPrograms[0].flyer_url || specialPrograms[0].image_url || '';
+  const firstFlyer = specialPrograms[0].flyer_url || specialPrograms[0].image_url || storageBase + '/Service/First%20Service.jpg';
   return [{ json: { is_direct: true, is_interactive: false, image_url: firstFlyer, direct_reply: replyText } }];
 }
 
 // 4. FIRST TIMER FLOW
 if (buttonId === 'btn_first_timer' || lowerText.indexOf('first time') !== -1 || lowerText.indexOf('first timer') !== -1 || lowerText.indexOf('new member') !== -1 || lowerText.indexOf('visitor') !== -1 || lowerText.indexOf('im new') !== -1 || lowerText.indexOf('i am new') !== -1 || lowerText.indexOf('visiting') !== -1) {
-  const replyText = \`🎉 *WELCOME TO RCCG EVERFLOURISHING MEGA SANCTUARY!* 🎉\\n\\nWe are overjoyed to have you join us! At EVF Sanctuary, you are family, and we believe God brought you here for a glorious purpose.\\n\\n✨ *Our Weekly Services*:\\n• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n📍 *Address*: 7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State.\\n\\nWe would love to get to know you better! Please reply to us with:\\n1️⃣ *Your Full Name*\\n2️⃣ *Your Residential Location/Area*\\n3️⃣ *Any Prayer Request you would like us to pray for*\\n\\nGod bless you richly! 🙏\`;
+  const replyText = \`🎉 *WELCOME TO RCCG EVERFLOURISHING MEGA SANCTUARY!* 🎉\\n\\nWe are overjoyed to have you join us! At EVF Sanctuary, you are family, and we believe God brought you here for a glorious purpose.\\n\\n✨ *Our Weekly Services*:\\n• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n📍 *Location*: Main Sanctuary\\n\${CHURCH_ADDRESS}\\n\\nWe would love to get to know you better! Please reply to us with:\\n1️⃣ *Your Full Name*\\n2️⃣ *Your Residential Location/Area*\\n3️⃣ *Any Prayer Request you would like us to pray for*\\n\\nGod bless you richly! 🙏\`;
   return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Service/First%20Service.jpg', direct_reply: replyText } }];
 }
 
@@ -711,7 +906,7 @@ if (
   const churchLat = 6.6805;
   const churchLng = 3.2350;
   const churchName = 'RCCG Everflourishing Mega Sanctuary';
-  const churchAddress = '7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State';
+  const churchAddress = CHURCH_ADDRESS;
   return [{
     json: {
       is_direct: true,
@@ -731,7 +926,7 @@ if (
 if (lowerText.indexOf('sunday') !== -1 || lowerText.indexOf('service schedule') !== -1 || lowerText.indexOf('service time') !== -1 || buttonId === 'btn_services') {
   let sundayTopic = \`🎉 *SUNDAY WORSHIP SERVICE*\\n\\n• *1st Service*: *8:00 AM – 9:45 AM*\\n• *Sunday School*: *9:45 AM – 10:15 AM*\\n• *2nd Service*: *10:15 AM – 12:00 PM*\`;
   let sundayFlyer = storageBase + '/Service/First%20Service.jpg';
-  const replyText = sundayTopic + '\\n\\n📍 *Address*: 7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State.';
+  const replyText = sundayTopic + '\\n\\n📍 *Location*: Main Sanctuary\\n' + CHURCH_ADDRESS;
   return [{ json: { is_direct: true, is_interactive: false, image_url: sundayFlyer, direct_reply: replyText } }];
 }
 
@@ -1055,42 +1250,6 @@ return [{
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$vars.SUPABASE_URL}}/rest/v1/processed_messages?on_conflict=wa_message_id",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
-            },
-            {
-              "name": "Prefer",
-              "value": "resolution=ignore-duplicates,return=representation"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { wa_message_id: $json.wa_message_id } }}",
-        "options": {}
-      },
-      "id": "2f4c91dc-764e-443b-9c7f-664143d96776",
-      "name": "Claim Message ID (Dedup)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [ 6688, 3408 ]
-    },
-    {
-      "parameters": {
         "jsCode": "let errMsg = '';\ntry { errMsg = JSON.stringify($json.error || $json); } catch (e) { errMsg = String($json); }\n\nconst isRateLimit = /429|rate.?limit|quota/i.test(errMsg);\n\nconst reply = isRateLimit\n  ? \"We're getting a lot of messages right now 🙏 Please give us a moment and try again shortly, or a team member will respond soon.\"\n  : \"We've received your message! Someone from our team will get back to you shortly. 🙏\";\n\nreturn [{ json: { reply, image_url: '' } }];"
       },
       "id": "d965dee3-1bb7-4507-b27a-4eaf3d450a20",
@@ -1131,16 +1290,6 @@ return [{
       "typeVersion": 4.2,
       "position": [ 11840, 3760 ],
       "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "return [{ json: $('Parse Incoming Message').first().json }];"
-      },
-      "id": "c1bbd58d-81f8-4484-8e8a-cb353ed050a5",
-      "name": "Restore Parsed Message Data",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [ 7360, 3408 ]
     },
     {
       "parameters": {
@@ -1374,111 +1523,6 @@ return [{
       "typeVersion": 1.1,
       "position": [ 6688, 2448 ],
       "webhookId": "wait-reminder-time-webhook"
-    },
-    {
-      "parameters": {
-        "url": "={{$vars.SUPABASE_URL}}/rest/v1/special_programs",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "branch_id",
-              "value": "=eq.{{$(\"Extract branch_id\").first().json.branch_id}}"
-            },
-            {
-              "name": "is_active",
-              "value": "eq.true"
-            },
-            {
-              "name": "order",
-              "value": "program_date.asc"
-            },
-            {
-              "name": "limit",
-              "value": "20"
-            }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "d378aa6d-9d65-45e0-8dc9-6a24771ec1ac",
-      "name": "Fetch Special Programs",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [ 10048, 3408 ],
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://graph.facebook.com/v20.0/{{ $('Parse Incoming Message').first().json.phone_number_id }}/messages",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { messaging_product: 'whatsapp', status: 'read', message_id: $json.wa_message_id, typing_indicator: { type: 'text' } } }}",
-        "options": {}
-      },
-      "id": "9d091e36-f2f1-4c2d-99b6-3eccfb64cee6",
-      "name": "Send Typing Indicator",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [ 7136, 3408 ],
-      "retryOnFail": false,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "leftValue": "={{$json.wa_message_id}}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "13d3c3cf-95cf-41f7-bb48-b0b3a57a23d9",
-      "name": "New Message? (not duplicate)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [ 6912, 3408 ]
     }
   ],
   "pinData": {},
@@ -1497,6 +1541,18 @@ return [{
     },
     "Is Status Update? (skip)": {
       "main": [ [], [ { "node": "Claim Message ID (Dedup)", "type": "main", "index": 0 } ] ]
+    },
+    "Claim Message ID (Dedup)": {
+      "main": [ [ { "node": "New Message? (not duplicate)", "type": "main", "index": 0 } ] ]
+    },
+    "New Message? (not duplicate)": {
+      "main": [ [ { "node": "Send Typing Indicator", "type": "main", "index": 0 } ], [] ]
+    },
+    "Send Typing Indicator": {
+      "main": [ [ { "node": "Restore Parsed Message Data", "type": "main", "index": 0 } ] ]
+    },
+    "Restore Parsed Message Data": {
+      "main": [ [ { "node": "Lookup Branch by Phone Number ID", "type": "main", "index": 0 } ] ]
     },
     "Lookup Branch by Phone Number ID": {
       "main": [ [ { "node": "Extract branch_id", "type": "main", "index": 0 } ] ]
@@ -1534,6 +1590,9 @@ return [{
     "Fetch Events": {
       "main": [ [ { "node": "Fetch Special Programs", "type": "main", "index": 0 } ] ]
     },
+    "Fetch Special Programs": {
+      "main": [ [ { "node": "Build AI Context", "type": "main", "index": 0 } ] ]
+    },
     "Build AI Context": {
       "main": [ [ { "node": "Is Direct Quick Reply?", "type": "main", "index": 0 } ] ]
     },
@@ -1552,44 +1611,20 @@ return [{
     "Extract AI Reply": {
       "main": [ [ { "node": "Save Outbound Message", "type": "main", "index": 0 }, { "node": "Prepare Reply Payload", "type": "main", "index": 0 } ] ]
     },
+    "Prepare Reply Payload": {
+      "main": [ [ { "node": "Send WhatsApp Reply", "type": "main", "index": 0 } ] ]
+    },
     "Send WhatsApp Reply": {
       "main": [ [], [ { "node": "Prepare Fallback Text", "type": "main", "index": 0 }, { "node": "Log Error", "type": "main", "index": 0 } ] ]
     },
     "Prepare Fallback Text": {
       "main": [ [ { "node": "Send Text Fallback (image failed)", "type": "main", "index": 0 } ] ]
     },
-    "Prepare Reply Payload": {
-      "main": [ [ { "node": "Send WhatsApp Reply", "type": "main", "index": 0 } ] ]
-    },
-    "Claim Message ID (Dedup)": {
-      "main": [ [ { "node": "New Message? (not duplicate)", "type": "main", "index": 0 } ] ]
-    },
     "AI Fallback Reply": {
       "main": [ [ { "node": "Save Outbound Message", "type": "main", "index": 0 }, { "node": "Prepare Reply Payload", "type": "main", "index": 0 } ] ]
     },
-    "Restore Parsed Message Data": {
-      "main": [ [ { "node": "Lookup Branch by Phone Number ID", "type": "main", "index": 0 } ] ]
-    },
     "Cron Daily Schedule": {
       "main": [ [ { "node": "Determine Due Reminders", "type": "main", "index": 0 } ] ]
-    },
-    "Should Send Reminder?": {
-      "main": [ [ { "node": "Claim Reminder Slot (Dedup)", "type": "main", "index": 0 } ] ]
-    },
-    "Fetch All WhatsApp Members": {
-      "main": [ [ { "node": "Fetch Phone Number ID", "type": "main", "index": 0 } ] ]
-    },
-    "Fetch Phone Number ID": {
-      "main": [ [ { "node": "Prepare Broadcast Payload", "type": "main", "index": 0 } ] ]
-    },
-    "Claim Reminder Slot (Dedup)": {
-      "main": [ [ { "node": "Slot Claimed? (not already sent)", "type": "main", "index": 0 } ] ]
-    },
-    "Slot Claimed? (not already sent)": {
-      "main": [ [ { "node": "Fetch All WhatsApp Members", "type": "main", "index": 0 } ] ]
-    },
-    "Prepare Broadcast Payload": {
-      "main": [ [ { "node": "Send WhatsApp Broadcast to Member", "type": "main", "index": 0 } ] ]
     },
     "Determine Due Reminders": {
       "main": [ [ { "node": "Loop Reminders", "type": "main", "index": 0 } ] ]
@@ -1600,17 +1635,26 @@ return [{
     "Wait Until Reminder Time": {
       "main": [ [ { "node": "Should Send Reminder?", "type": "main", "index": 0 } ] ]
     },
+    "Should Send Reminder?": {
+      "main": [ [ { "node": "Claim Reminder Slot (Dedup)", "type": "main", "index": 0 } ] ]
+    },
+    "Claim Reminder Slot (Dedup)": {
+      "main": [ [ { "node": "Slot Claimed? (not already sent)", "type": "main", "index": 0 } ] ]
+    },
+    "Slot Claimed? (not already sent)": {
+      "main": [ [ { "node": "Fetch All WhatsApp Members", "type": "main", "index": 0 } ] ]
+    },
+    "Fetch All WhatsApp Members": {
+      "main": [ [ { "node": "Fetch Phone Number ID", "type": "main", "index": 0 } ] ]
+    },
+    "Fetch Phone Number ID": {
+      "main": [ [ { "node": "Prepare Broadcast Payload", "type": "main", "index": 0 } ] ]
+    },
+    "Prepare Broadcast Payload": {
+      "main": [ [ { "node": "Send WhatsApp Broadcast to Member", "type": "main", "index": 0 } ] ]
+    },
     "Send WhatsApp Broadcast to Member": {
       "main": [ [ { "node": "Loop Reminders", "type": "main", "index": 0 } ] ]
-    },
-    "Fetch Special Programs": {
-      "main": [ [ { "node": "Build AI Context", "type": "main", "index": 0 } ] ]
-    },
-    "Send Typing Indicator": {
-      "main": [ [ { "node": "Restore Parsed Message Data", "type": "main", "index": 0 } ] ]
-    },
-    "New Message? (not duplicate)": {
-      "main": [ [ { "node": "Send Typing Indicator", "type": "main", "index": 0 } ], [] ]
     }
   },
   "active": true,
@@ -1632,4 +1676,4 @@ return [{
 };
 
 fs.writeFileSync('n8n-workflow-churchflow-fixed.json', JSON.stringify(workflow, null, 2));
-console.log('Successfully generated n8n-workflow-churchflow-fixed.json');
+console.log('Successfully written updated n8n-workflow-churchflow-fixed.json');
