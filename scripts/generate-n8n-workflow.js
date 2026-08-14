@@ -866,10 +866,11 @@ const matchedDbEvent = findMatchingDbEvent(lowerText);
 if (matchedDbEvent) {
   const meta = parseMeta(matchedDbEvent.description);
 
-  let flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || storageBase + '/Service/First%20Service.jpg';
-  // Ensure valid HTTP flyer URL
-  if (!flyer || (flyer.indexOf('http') !== 0 && flyer.indexOf('data:image/') !== 0)) {
-    flyer = storageBase + '/Service/First%20Service.jpg';
+  let flyer = '';
+  if (matchedDbEvent.id && String(matchedDbEvent.id).indexOf('recurring-') !== 0) {
+    flyer = 'https://churchflow-dashboard.vercel.app/api/events/flyer?id=' + matchedDbEvent.id;
+  } else {
+    flyer = matchedDbEvent.banner_url || meta.embeddedFlyer || storageBase + '/Service/First%20Service.jpg';
   }
 
   const rawScripture = meta.embeddedScripture || matchedDbEvent.scripture || '';
