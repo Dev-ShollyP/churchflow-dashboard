@@ -22,12 +22,27 @@ interface SpecialProgram {
   image_url?: string;
   program_date?: string;
   end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  verse?: string;
+  venue?: string;
   is_active: boolean;
   created_at: string;
   created_by?: string;
 }
 
-const defaultProgramForm = { title: '', description: '', flyer_url: '', program_date: '', end_date: '', image_url: '' };
+const defaultProgramForm = {
+  title: '',
+  description: '',
+  flyer_url: '',
+  program_date: '',
+  end_date: '',
+  start_time: '18:00',
+  end_time: '21:00',
+  verse: '',
+  venue: 'Main Sanctuary',
+  image_url: ''
+};
 const defaultEventForm = {
   id: '',
   title: 'Sunday Worship Celebration',
@@ -321,13 +336,23 @@ export default function EventsPage() {
       } catch {}
     }
 
+    let activeBranchId = branchId;
+    if (!activeBranchId) {
+      const { data: sess } = await supabase.from('whatsapp_sessions').select('branch_id').limit(1).single();
+      activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
+    }
+
     const { data: programData, error } = await supabase.from('special_programs').insert({
+      branch_id: activeBranchId || DEFAULT_BRANCH_ID,
       title: form.title.trim(),
       description: form.description.trim() || null,
       flyer_url: form.flyer_url.trim() || null,
       image_url: uploadedImageUrl || null,
       program_date: form.program_date || null,
       end_date: form.end_date || null,
+      start_time: form.start_time || null,
+      verse: form.verse?.trim() || null,
+      venue: form.venue?.trim() || 'Main Sanctuary',
       is_active: true,
     }).select().single();
 
@@ -348,6 +373,8 @@ export default function EventsPage() {
             description: form.description.trim(),
             program_date: form.program_date,
             end_date: form.end_date,
+            start_time: form.start_time,
+            verse: form.verse,
             image_url: uploadedImageUrl || form.flyer_url,
             send_broadcast: true,
           }),
@@ -650,6 +677,12 @@ export default function EventsPage() {
                         </span>
                       </div>
 
+                      {prog.verse && (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gold/10 border border-gold/25 text-gold text-[11px] font-semibold mb-3">
+                          <span>📖 {prog.verse}</span>
+                        </div>
+                      )}
+
                       {prog.description && (
                         <p className="text-xs text-white/70 mb-4 line-clamp-3 leading-relaxed">{prog.description}</p>
                       )}
@@ -662,6 +695,12 @@ export default function EventsPage() {
                               {format(parseISO(prog.program_date), 'MMM d, yyyy')}
                               {prog.end_date ? ` - ${format(parseISO(prog.end_date), 'MMM d, yyyy')}` : ''}
                             </span>
+                          </div>
+                        )}
+                        {prog.start_time && (
+                          <div className="flex items-center gap-2">
+                            <Clock size={13} className="text-gold flex-shrink-0" />
+                            <span>{prog.start_time}{prog.end_time ? ` - ${prog.end_time}` : ''}</span>
                           </div>
                         )}
                       </div>
@@ -886,6 +925,38 @@ export default function EventsPage() {
                     className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-white/60 mb-1 font-semibold">Start Time</label>
+                  <input
+                    type="time"
+                    value={form.start_time || ''}
+                    onChange={e => setForm({ ...form, start_time: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white/60 mb-1 font-semibold">End Time</label>
+                  <input
+                    type="time"
+                    value={form.end_time || ''}
+                    onChange={e => setForm({ ...form, end_time: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-white/60 mb-1 font-semibold">Scripture Reference (Optional)</label>
+                <input
+                  type="text"
+                  value={form.verse || ''}
+                  onChange={e => setForm({ ...form, verse: e.target.value })}
+                  placeholder="e.g. Isaiah 49:6B / Mark 11:23 / Psalm 100:4"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                />
               </div>
 
               <div>
