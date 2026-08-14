@@ -235,6 +235,14 @@ export default function EventsPage() {
   }
 
   function handleOpenEditProgramModal(prog: SpecialProgram) {
+    let sTime = prog.start_time || '18:00';
+    let eTime = '21:00';
+    if (sTime.includes('-')) {
+      const parts = sTime.split('-');
+      sTime = parts[0].trim();
+      eTime = (parts[1] || '21:00').trim();
+    }
+
     setEditingProgram(prog);
     setForm({
       title: prog.title,
@@ -242,8 +250,8 @@ export default function EventsPage() {
       flyer_url: prog.flyer_url || '',
       program_date: prog.program_date || '',
       end_date: prog.end_date || '',
-      start_time: prog.start_time || '18:00',
-      end_time: prog.end_time || '21:00',
+      start_time: sTime,
+      end_time: eTime,
       verse: prog.verse || '',
       venue: prog.venue || 'Main Sanctuary',
       image_url: prog.image_url || prog.flyer_url || '',
@@ -373,6 +381,8 @@ export default function EventsPage() {
       activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
     }
 
+    const timeFormatted = form.start_time ? (form.end_time ? `${form.start_time} - ${form.end_time}` : form.start_time) : null;
+
     const payload: any = {
       branch_id: activeBranchId || DEFAULT_BRANCH_ID,
       title: form.title.trim(),
@@ -381,8 +391,7 @@ export default function EventsPage() {
       image_url: uploadedImageUrl || null,
       program_date: form.program_date || null,
       end_date: form.end_date || null,
-      start_time: form.start_time || null,
-      end_time: form.end_time || null,
+      start_time: timeFormatted,
       verse: form.verse?.trim() || null,
       venue: form.venue?.trim() || 'Main Sanctuary',
       is_active: true,
