@@ -98,6 +98,7 @@ export default function EventsPage() {
   const [programs, setPrograms] = useState<SpecialProgram[]>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<SpecialProgram | null>(null);
   const [form, setForm] = useState(defaultProgramForm);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -225,6 +226,33 @@ export default function EventsPage() {
     setShowEventModal(true);
   }
 
+  function handleOpenNewProgramModal() {
+    setEditingProgram(null);
+    setForm(defaultProgramForm);
+    setImageFile(null);
+    setImagePreview(null);
+    setShowModal(true);
+  }
+
+  function handleOpenEditProgramModal(prog: SpecialProgram) {
+    setEditingProgram(prog);
+    setForm({
+      title: prog.title,
+      description: prog.description || '',
+      flyer_url: prog.flyer_url || '',
+      program_date: prog.program_date || '',
+      end_date: prog.end_date || '',
+      start_time: prog.start_time || '18:00',
+      end_time: prog.end_time || '21:00',
+      verse: prog.verse || '',
+      venue: prog.venue || 'Main Sanctuary',
+      image_url: prog.image_url || prog.flyer_url || '',
+    });
+    setImageFile(null);
+    setImagePreview(prog.image_url || prog.flyer_url || null);
+    setShowModal(true);
+  }
+
   async function handleSaveEvent() {
     if (!eventForm.title.trim() || !eventForm.event_date) return;
     setSavingEvent(true);
@@ -314,18 +342,15 @@ export default function EventsPage() {
     if (!form.title.trim()) return;
     setSaving(true);
 
-    let uploadedImageUrl = '';
+    let uploadedImageUrl = form.image_url;
     if (imageFile) {
       try {
-        const ext = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-        const filePath = `Special Programs/${fileName}`;
-        const { error: uploadError } = await supabase.storage
-          .from('Flyers')
-          .upload(filePath, imageFile, { upsert: true });
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('Flyers').getPublicUrl(filePath);
-          uploadedImageUrl = urlData.publicUrl;
+        const apiFormData = new FormData();
+        apiFormData.append('file', imageFile);
+        const res = await fetch('/api/events/upload', { method: 'POST', body: apiFormData });
+        const json = await res.json();
+        if (json.publicUrl) {
+          uploadedImageUrl = json.publicUrl;
         } else {
           uploadedImageUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
@@ -333,7 +358,13 @@ export default function EventsPage() {
             reader.readAsDataURL(imageFile);
           });
         }
-      } catch {}
+      } catch {
+        uploadedImageUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(imageFile);
+        });
+      }
     }
 
     let activeBranchId = branchId;
@@ -342,7 +373,7 @@ export default function EventsPage() {
       activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
     }
 
-    const { data: programData, error } = await supabase.from('special_programs').insert({
+    const payload: any = {
       branch_id: activeBranchId || DEFAULT_BRANCH_ID,
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -351,42 +382,64 @@ export default function EventsPage() {
       program_date: form.program_date || null,
       end_date: form.end_date || null,
       start_time: form.start_time || null,
+      end_time: form.end_time || null,
       verse: form.verse?.trim() || null,
       venue: form.venue?.trim() || 'Main Sanctuary',
       is_active: true,
-    }).select().single();
+    };
 
-    if (error) {
-      setSaving(false);
-      showToast('error', error.message);
-      return;
-    }
+    if (editingProgram) {
+      const { error: updateErr } = await supabase
+        .from('special_programs')
+        .update(payload)
+        .eq('id', editingProgram.id);
 
-    if (sendBroadcast) {
-      try {
-        await fetch('/api/programs/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            program_id: programData?.id,
-            title: form.title.trim(),
-            description: form.description.trim(),
-            program_date: form.program_date,
-            end_date: form.end_date,
-            start_time: form.start_time,
-            verse: form.verse,
-            image_url: uploadedImageUrl || form.flyer_url,
-            send_broadcast: true,
-          }),
-        });
-      } catch (notifyErr) {
-        console.error('Failed to dispatch broadcast notification:', notifyErr);
+      if (updateErr) {
+        setSaving(false);
+        showToast('error', updateErr.message);
+        return;
       }
+      showToast('success', 'Special Program updated with flyer design!');
+    } else {
+      const { data: programData, error } = await supabase
+        .from('special_programs')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        setSaving(false);
+        showToast('error', error.message);
+        return;
+      }
+
+      if (sendBroadcast) {
+        try {
+          await fetch('/api/programs/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              program_id: programData?.id,
+              title: form.title.trim(),
+              description: form.description.trim(),
+              program_date: form.program_date,
+              end_date: form.end_date,
+              start_time: form.start_time,
+              verse: form.verse,
+              image_url: uploadedImageUrl || form.flyer_url,
+              send_broadcast: true,
+            }),
+          });
+        } catch (notifyErr) {
+          console.error('Failed to dispatch broadcast notification:', notifyErr);
+        }
+      }
+      showToast('success', sendBroadcast ? 'Special Program created & WhatsApp broadcast queued!' : 'Special Program created!');
     }
 
     setSaving(false);
-    showToast('success', sendBroadcast ? 'Special Program created & WhatsApp broadcast queued!' : 'Special Program created!');
     setShowModal(false);
+    setEditingProgram(null);
     setForm(defaultProgramForm);
     setImageFile(null);
     setImagePreview(null);
@@ -444,7 +497,7 @@ export default function EventsPage() {
               </button>
             ) : (
               <button
-                onClick={() => setShowModal(true)}
+                onClick={handleOpenNewProgramModal}
                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold btn-gold shadow-gold"
               >
                 <Plus size={16} />
@@ -708,7 +761,14 @@ export default function EventsPage() {
                   </div>
 
                   {canWrite && (
-                    <div className="px-5 py-3 bg-black/40 border-t border-white/5 flex items-center justify-end">
+                    <div className="px-5 py-3 bg-black/40 border-t border-white/5 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => handleOpenEditProgramModal(prog)}
+                        className="text-xs text-gold/90 hover:text-gold flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-lg border border-gold/30 hover:border-gold/60 bg-gold/5"
+                      >
+                        <Edit3 size={12} />
+                        Edit Program / Flyer
+                      </button>
                       <button
                         onClick={() => handleDeleteProgram(prog.id)}
                         disabled={deletingId === prog.id}
@@ -860,16 +920,18 @@ export default function EventsPage() {
         </div>
       )}
 
-      {/* Add Program Modal */}
+      {/* Add / Edit Program Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="glass-card w-full max-w-lg p-6 space-y-4 animate-popover border border-gold/30">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-display font-semibold text-white text-base">Post Special Program</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="glass-card w-full max-w-lg p-6 animate-popover border border-gold/30 my-auto max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-shrink-0">
+              <h3 className="font-display font-semibold text-white text-base">
+                {editingProgram ? 'Edit Special Program & Flyer' : 'Post Special Program'}
+              </h3>
               <button onClick={() => setShowModal(false)} className="text-white/40 hover:text-white"><X size={18} /></button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto pr-1.5 flex-1 my-2">
               <div>
                 <label className="block text-white/60 mb-1 font-semibold">Program Title *</label>
                 <input
@@ -988,11 +1050,11 @@ export default function EventsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10">
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10 flex-shrink-0">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-xl text-xs font-semibold btn-glass">Cancel</button>
               <button onClick={handleAddProgram} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                {saving ? 'Posting...' : 'Post Program'}
+                {saving ? <Loader2 size={14} className="animate-spin" /> : editingProgram ? <Edit3 size={14} /> : <Plus size={14} />}
+                {saving ? 'Saving...' : editingProgram ? 'Update Program & Flyer' : 'Post Program'}
               </button>
             </div>
           </div>
