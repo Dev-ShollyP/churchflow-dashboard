@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xzyrftzhaolovlbnpbpk.supabase.co';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eXJmdHpoYW9sb3ZsYm5wYnBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDk4NDgsImV4cCI6MjEwMDEyNTg0OH0.EpHzchjPGnRoQgaY-zGF9GvyPNcR-JQt9kAL5zosT3I';
@@ -19,18 +17,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing event ID' }, { status: 400 });
     }
 
-    // Check events table first
+    let flyerSource = '';
+    let title = '';
+
+    // 1. Check events table
     const { data: event } = await supabase
       .from('events')
       .select('id, banner_url, description, title')
       .eq('id', id)
       .single();
 
-    let flyerSource = event?.banner_url || '';
-    let title = (event?.title || '').toLowerCase();
+    if (event) {
+      title = (event.title || '').toLowerCase();
+      // Check banner_url first
+      if (event.banner_url && event.banner_url.startsWith('data:image/')) {
+        flyerSource = event.banner_url;
+      } else if (event.description) {
+        const match = event.description.match(/\[FLYER:\s*([^\]]+)\]/);
+        if (match) flyerSource = match[1].trim();
+      }
+      if (!flyerSource && event.banner_url && !event.banner_url.includes('/api/events/flyer')) {
+        flyerSource = event.banner_url;
+      }
+    }
 
-    // If not found in events, check special_programs
-    if (!event) {
+    // 2. If not found in events, check special_programs
+    if (!flyerSource) {
       const { data: program } = await supabase
         .from('special_programs')
         .select('id, image_url, flyer_url, description, title')
@@ -38,32 +50,18 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (program) {
-        flyerSource = program.flyer_url || program.image_url || '';
         title = (program.title || '').toLowerCase();
+        if (program.image_url && program.image_url.startsWith('data:image/')) {
+          flyerSource = program.image_url;
+        } else if (program.flyer_url && !program.flyer_url.includes('/api/events/flyer')) {
+          flyerSource = program.flyer_url;
+        } else if (program.image_url && !program.image_url.includes('/api/events/flyer')) {
+          flyerSource = program.image_url;
+        }
       }
     }
 
-    // Check for Youth Sunday local asset fallback
-    if (id === '8161e678-0a2e-4b7a-99e6-601d361e384b' || title.includes('youth')) {
-      const flyerPath = path.join(process.cwd(), 'public/flyers/youth-sunday.jpg');
-      if (fs.existsSync(flyerPath)) {
-        const buffer = fs.readFileSync(flyerPath);
-        return new NextResponse(buffer, {
-          headers: {
-            'Content-Type': 'image/jpeg',
-            'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-          },
-        });
-      }
-    }
-
-    // If banner_url is empty, check embedded description metadata
-    if (!flyerSource && event?.description) {
-      const match = event.description.match(/\[FLYER:\s*([^\]]+)\]/);
-      if (match) flyerSource = match[1].trim();
-    }
-
-    // Handle Base64 Data URL (convert to binary JPEG/PNG with 200 OK)
+    // 3. If flyerSource is a Base64 Data URL, decode and serve binary JPEG/PNG with 200 OK
     if (flyerSource && flyerSource.startsWith('data:image/')) {
       const parts = flyerSource.split(',');
       const mime = parts[0].split(';')[0].split(':')[1] || 'image/jpeg';
@@ -78,12 +76,12 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Handle standard HTTPS flyer URL (must NOT be pointing recursively to this endpoint)
-    if (flyerSource && (flyerSource.startsWith('http://') || flyerSource.startsWith('https://')) && flyerSource.indexOf('/api/events/flyer') === -1 && flyerSource.indexOf('/api/flyers') === -1) {
+    // 4. If flyerSource is a direct HTTPS URL, redirect to it
+    if (flyerSource && (flyerSource.startsWith('http://') || flyerSource.startsWith('https://')) && !flyerSource.includes('/api/events/flyer')) {
       return NextResponse.redirect(flyerSource);
     }
 
-    // Fallback default service flyers
+    // 5. Fallback service flyers
     if (title.includes('thanksgiving')) return NextResponse.redirect('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/Thanks.jpg');
     if (title.includes('digging')) return NextResponse.redirect('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/Digging%20Deep.png');
     if (title.includes('faith')) return NextResponse.redirect('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/faith%20clinic.jpg');
