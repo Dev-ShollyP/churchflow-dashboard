@@ -248,10 +248,10 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
       {showTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
           <div
-            style={{ backgroundColor: '#0D1B3E' }}
-            className="w-full max-w-lg p-5 sm:p-6 space-y-4 animate-slide-up rounded-2xl border border-gold/40 shadow-2xl"
+            style={{ backgroundColor: '#0D1B3E', maxHeight: '90vh' }}
+            className="w-full max-w-lg flex flex-col animate-slide-up rounded-2xl border border-gold/40 shadow-2xl overflow-hidden"
           >
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-6 pb-3 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-gold" />
                 <h3 className="font-display font-semibold text-white text-base">Select Meta Approved Template</h3>
@@ -263,6 +263,9 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                 <X size={18} />
               </button>
             </div>
+
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 p-5 sm:p-6 space-y-4">
 
             <p className="text-xs text-white/70 leading-relaxed">
               Meta requires an approved template message to contact members when more than 24 hours have passed since their last message.
@@ -492,7 +495,11 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
+            {/* Close scrollable body */}
+            </div>
+
+            {/* Sticky Footer Buttons */}
+            <div className="flex items-center justify-end gap-2.5 px-5 sm:px-6 py-4 border-t border-white/10 flex-shrink-0" style={{ backgroundColor: '#0D1B3E' }}>
               <button
                 type="button"
                 onClick={() => setShowTemplateModal(false)}
