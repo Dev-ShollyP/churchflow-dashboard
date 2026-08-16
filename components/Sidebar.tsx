@@ -28,7 +28,7 @@ const navItems: NavItem[] = [
   { href: '/conversations',  label: 'Live Conversations',  icon: MessageSquare,   permissionKey: 'conversations' },
   { href: '/prayers',        label: 'Prayer Requests',     icon: Heart,           permissionKey: 'prayers' },
   { href: '/events',         label: 'Events & Programs',   icon: Calendar,        permissionKey: 'events' },
-  { href: '/hymns',          label: 'RCCG Hymnal (826)',   icon: BookOpen,        permissionKey: 'hymns' },
+  { href: '/hymns',          label: 'Hymnal',              icon: BookOpen,        permissionKey: 'hymns' },
   { href: '/events/upload',  label: 'Upload Flyer',        icon: UploadCloud,     permissionKey: 'upload' },
   { href: '/onboarding',     label: 'Member Onboarding',   icon: QrCode,          permissionKey: 'onboarding' },
   { href: '/staff',          label: 'Staff & Roles',       icon: UserCheck,       permissionKey: 'staff' },
