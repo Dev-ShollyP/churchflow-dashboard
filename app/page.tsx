@@ -99,7 +99,7 @@ export default function OverviewPage() {
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold btn-gold shadow-gold"
             >
               <BookOpen size={16} />
-              <span>RCCG Hymnal</span>
+              <span>Hymnal</span>
             </Link>
             <Link
               href="/conversations"
