@@ -114,7 +114,7 @@ export default function HymnsPage() {
     if (!uploadTitle.trim() || !uploadVerses.trim()) return;
     setUploadSaving(true);
 
-    const maxNum = Math.max(...allHymns.map(h => h.number), 999);
+    const maxNum = allHymns.length > 0 ? Math.max(...allHymns.map(h => h.number)) : 0;
     const verses = uploadVerses
       .split(/\n\n+/)
       .map(v => v.trim())
@@ -162,7 +162,7 @@ export default function HymnsPage() {
         <div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
             <BookOpen className="text-gold" size={28} />
-            RCCG Hymnal
+            Hymnal
           </h1>
           <p className="text-xs sm:text-sm text-white/50 mt-1">
             {allHymns.length} hymns with full lyrics · {customHymns.length} custom uploads
@@ -416,7 +416,7 @@ export default function HymnsPage() {
                     {selectedHymn.title}
                   </h2>
                   <p className="text-xs text-gold/70 mt-0.5 font-medium">
-                    {selectedHymn.isCustom ? 'Custom Upload' : 'The Redeemed Hymnal (4th Edition)'} &bull; {selectedHymn.verses?.length} Verses
+                    {selectedHymn.isCustom ? 'Custom Upload' : 'Hymnal'} &bull; {selectedHymn.verses?.length} Verses
                   </p>
                   {selectedHymn.scripture && (
                     <p className="text-[11px] text-white/40 italic mt-0.5">
