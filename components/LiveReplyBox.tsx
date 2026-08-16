@@ -21,8 +21,14 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
   const [selectedTemplate, setSelectedTemplate] = useState('staff_followup');
   const [paramMemberName, setParamMemberName] = useState(memberName || 'Member');
   const [paramStaffName, setParamStaffName] = useState('Pastor / Staff Member');
-  const [serviceTitle, setServiceTitle] = useState('Sunday Worship Celebration');
-  const [serviceTime, setServiceTime] = useState('Tomorrow at 8:00 AM');
+  const [remTitleUpper, setRemTitleUpper] = useState('SUNDAY WORSHIP CELEBRATION');
+  const [remOffset, setRemOffset] = useState('IN 30 MINUTES');
+  const [remMemberName, setRemMemberName] = useState(memberName || 'Believer');
+  const [remServiceName, setRemServiceName] = useState('Sunday Worship Celebration');
+  const [remDate, setRemDate] = useState('Sunday');
+  const [remTime, setRemTime] = useState('8:00 AM');
+  const [remVerse, setRemVerse] = useState('"Enter into his gates with thanksgiving, and into his courts with praise: be thankful unto him, and bless his name." — Psalm 100:4');
+  const [remFlyerUrl, setRemFlyerUrl] = useState('https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/First%20Service.jpg');
   const [customParams, setCustomParams] = useState('');
   const [templateSending, setTemplateSending] = useState(false);
 
@@ -87,10 +93,21 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
     setStatus(null);
 
     let finalParams: string[] = [];
+    let flyerUrlToSend = '';
+
     if (selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') {
       finalParams = [paramMemberName.trim(), paramStaffName.trim()];
     } else if (selectedTemplate === 'service_reminder') {
-      finalParams = [serviceTitle.trim(), serviceTime.trim(), paramMemberName.trim()];
+      finalParams = [
+        remTitleUpper.trim() || 'SUNDAY WORSHIP CELEBRATION',
+        remOffset.trim() || 'IN 30 MINUTES',
+        remMemberName.trim() || paramMemberName.trim() || 'Believer',
+        remServiceName.trim() || 'Sunday Worship Celebration',
+        remDate.trim() || 'Sunday',
+        remTime.trim() || '8:00 AM',
+        remVerse.trim() || '"Enter into his gates with thanksgiving." — Psalm 100:4',
+      ];
+      flyerUrlToSend = remFlyerUrl.trim();
     } else if (customParams.trim()) {
       finalParams = customParams.split(',').map(s => s.trim());
     }
@@ -105,6 +122,7 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
           template_name: selectedTemplate,
           language_code: 'en',
           parameters: finalParams,
+          header_image_url: flyerUrlToSend,
         }),
       });
 
@@ -309,47 +327,112 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                 </div>
               )}
 
-              {/* Dynamic Preset Inputs for service_reminder */}
+              {/* Dynamic Preset Inputs for service_reminder (All 7 Parameters & Image Header) */}
               {selectedTemplate === 'service_reminder' && (
                 <div
                   style={{ backgroundColor: '#060B18' }}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 rounded-xl border border-white/10"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-xl border border-white/10"
                 >
                   <div>
                     <label className="block text-[11px] font-medium text-gold/80 mb-1">
-                      Service Title &#123;&#123;1&#125;&#125;
+                      Header Title &#123;&#123;1&#125;&#125; (UPPERCASE)
                     </label>
                     <input
                       type="text"
-                      value={serviceTitle}
-                      onChange={(e) => setServiceTitle(e.target.value)}
-                      placeholder="e.g. Sunday Worship"
+                      value={remTitleUpper}
+                      onChange={(e) => setRemTitleUpper(e.target.value)}
+                      placeholder="e.g. SUNDAY WORSHIP CELEBRATION"
                       style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
                       className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gold/80 mb-1">
-                      Date &amp; Time &#123;&#123;2&#125;&#125;
+                      Time / Offset &#123;&#123;2&#125;&#125;
                     </label>
                     <input
                       type="text"
-                      value={serviceTime}
-                      onChange={(e) => setServiceTime(e.target.value)}
-                      placeholder="e.g. Sunday 8:00 AM"
+                      value={remOffset}
+                      onChange={(e) => setRemOffset(e.target.value)}
+                      placeholder="e.g. IN 30 MINUTES or TOMORROW AT 8:00 AM"
                       style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
                       className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gold/80 mb-1">
-                      Member Name &#123;&#123;3&#125;&#125;
+                      Member First Name &#123;&#123;3&#125;&#125;
                     </label>
                     <input
                       type="text"
-                      value={paramMemberName}
-                      onChange={(e) => setParamMemberName(e.target.value)}
-                      placeholder="e.g. Ayomide"
+                      value={remMemberName}
+                      onChange={(e) => setRemMemberName(e.target.value)}
+                      placeholder="e.g. Olushola"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Service Name &#123;&#123;4&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={remServiceName}
+                      onChange={(e) => setRemServiceName(e.target.value)}
+                      placeholder="e.g. Sunday Worship Celebration"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Date Label &#123;&#123;5&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={remDate}
+                      onChange={(e) => setRemDate(e.target.value)}
+                      placeholder="e.g. Sunday, August 16"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Time Label &#123;&#123;6&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={remTime}
+                      onChange={(e) => setRemTime(e.target.value)}
+                      placeholder="e.g. 8:00 AM"
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Scripture Verse &#123;&#123;7&#125;&#125;
+                    </label>
+                    <input
+                      type="text"
+                      value={remVerse}
+                      onChange={(e) => setRemVerse(e.target.value)}
+                      placeholder='e.g. "Enter into his gates with thanksgiving." — Psalm 100:4'
+                      style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
+                      className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-medium text-gold/80 mb-1">
+                      Flyer Image Header URL
+                    </label>
+                    <input
+                      type="text"
+                      value={remFlyerUrl}
+                      onChange={(e) => setRemFlyerUrl(e.target.value)}
+                      placeholder="https://.../Flyer.jpg"
                       style={{ backgroundColor: '#0D1B3E', color: '#ffffff' }}
                       className="w-full px-3 py-2 rounded-lg text-xs text-white border border-white/15 focus:border-gold/50 focus:outline-none"
                     />
@@ -382,15 +465,26 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                   <Sparkles size={13} />
                   <span>Meta Live Message Preview</span>
                 </div>
-                <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-xs text-white/90 leading-relaxed font-sans">
+                <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-xs text-white/90 leading-relaxed font-sans whitespace-pre-line">
                   {(selectedTemplate === 'staff_followup' || selectedTemplate === 'human_agent_takeover') ? (
                     <span>
                       Hello <strong>{paramMemberName || '{{1}}'}</strong>, this is <strong>{paramStaffName || '{{2}}'}</strong> from RCCG Everflourishing Mega Sanctuary. Regarding your message to our church line, I am available to chat with you now. How can we assist or pray with you today?
                     </span>
                   ) : selectedTemplate === 'service_reminder' ? (
-                    <span>
-                      🔔 Hello REMINDER: <strong>{serviceTitle || '{{1}}'}</strong> — <strong>{serviceTime || '{{2}}'}</strong>! Dear <strong>{paramMemberName || '{{3}}'}</strong>, this is a reminder for our upcoming service at RCCG Everflourishing Mega Sanctuary.
-                    </span>
+                    <div>
+                      🔔 Hello REMINDER: <strong>{remTitleUpper || '{{1}}'}</strong> — <strong>{remOffset || '{{2}}'}</strong>!
+                      <br /><br />
+                      Dear <strong>{remMemberName || '{{3}}'}</strong>, this is a reminder for our upcoming service.
+                      <br /><br />
+                      • Service: <strong>{remServiceName || '{{4}}'}</strong><br />
+                      • Date: <strong>{remDate || '{{5}}'}</strong><br />
+                      • Time: <strong>{remTime || '{{6}}'}</strong> WAT<br />
+                      📍 Address: 7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State.
+                      <br /><br />
+                      📖 Verse: <em>{remVerse || '{{7}}'}</em>
+                      <br /><br />
+                      See you there! God bless you. 🙏
+                    </div>
                   ) : (
                     <span>Meta approved template message dispatch...</span>
                   )}
