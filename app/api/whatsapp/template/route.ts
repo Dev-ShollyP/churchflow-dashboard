@@ -45,7 +45,7 @@ async function sendMetaTemplate(
 
 export async function POST(request: Request) {
   try {
-    const { conversation_id, member_phone, template_name = 'staff_followup', language_code = 'en', parameters = [] } = await request.json();
+    const { conversation_id, member_phone, template_name = 'staff_followup', language_code = 'en', parameters = [], header_image_url = '' } = await request.json();
 
     if (!conversation_id || !template_name) {
       return NextResponse.json({ error: 'Missing conversation_id or template_name' }, { status: 400 });
@@ -86,14 +86,50 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const templateComponents = parameters.length > 0
-      ? [
-          {
-            type: 'body',
-            parameters: parameters.map((val: string) => ({ type: 'text', text: val })),
-          },
-        ]
-      : [];
+    let templateComponents: any[] = [];
+    let recordSummary = parameters;
+
+    if (template_name === 'service_reminder') {
+      let p1 = parameters[0] || 'SUNDAY WORSHIP CELEBRATION';
+      let p2 = parameters[1] || 'IN 30 MINUTES';
+      let p3 = parameters[2] || 'Believer';
+      let p4 = parameters[3] || 'Sunday Worship Service';
+      let p5 = parameters[4] || 'Sunday';
+      let p6 = parameters[5] || '8:00 AM';
+      let p7 = parameters[6] || '"Enter into his gates with thanksgiving, and into his courts with praise." — Psalm 100:4';
+
+      if (parameters.length === 3) {
+        p1 = (parameters[0] || '').toUpperCase();
+        p2 = parameters[1] || 'IN 30 MINUTES';
+        p3 = parameters[2] || 'Believer';
+        p4 = parameters[0] || 'Sunday Worship Service';
+        p5 = 'Sunday';
+        p6 = parameters[1] || '8:00 AM';
+        p7 = '"Enter into his gates with thanksgiving, and into his courts with praise." — Psalm 100:4';
+      }
+
+      const final7 = [p1, p2, p3, p4, p5, p6, p7];
+      recordSummary = final7;
+      const flyerUrl = header_image_url || 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/First%20Service.jpg';
+
+      templateComponents = [
+        {
+          type: 'header',
+          parameters: [{ type: 'image', image: { link: flyerUrl } }],
+        },
+        {
+          type: 'body',
+          parameters: final7.map((val: string) => ({ type: 'text', text: val })),
+        },
+      ];
+    } else if (parameters.length > 0) {
+      templateComponents = [
+        {
+          type: 'body',
+          parameters: parameters.map((val: string) => ({ type: 'text', text: val })),
+        },
+      ];
+    }
 
     // Attempt 1: Try language_code (e.g. 'en')
     let metaRes = await sendMetaTemplate(phoneNumberId, whatsappToken, formattedPhone, template_name, language_code, templateComponents);
