@@ -61,6 +61,8 @@ export async function POST(request: Request) {
       description,
       program_date,
       end_date,
+      start_time,
+      scripture,
       flyer_url,
       image_url,
       send_broadcast = true,
@@ -102,11 +104,16 @@ export async function POST(request: Request) {
     let deliveredCount = 0;
 
     if (send_broadcast) {
-      // 1. Fetch active church members for broadcast dispatch
-      const { data: members, error: membersError } = await supabase
+      // 1. Fetch active church members for broadcast dispatch (members marked 'active' or 'member' on dashboard)
+      const { data: allMembers, error: membersError } = await supabase
         .from('members')
-        .select('id, full_name, phone')
+        .select('id, full_name, phone, membership_status')
         .not('phone', 'is', null);
+
+      const members = (allMembers || []).filter((m) => {
+        const st = (m.membership_status || '').toLowerCase().trim();
+        return st === 'active' || st === 'member';
+      });
 
       if (!membersError && members && members.length > 0) {
         broadcastCount = members.length;
@@ -127,16 +134,29 @@ export async function POST(request: Request) {
 
         await supabase.from('outbound_messages').insert(notifications).select();
 
-        // 3. Dispatch Meta Approved Template 'service_reminder' directly to all members (bypassing 24h window)
+        // 3. Dispatch Meta Approved Template 'service_reminder' directly to all active members (bypassing 24h window)
         for (const member of members) {
           const formattedPhone = (member.phone || '').replace(/\D/g, '');
           if (!formattedPhone) continue;
 
-          // Template parameters: {{1}} = Service Title, {{2}} = Date & Time, {{3}} = Member Name
+          const memberFirstName = (member.full_name || '').trim().split(' ')[0] || 'Believer';
+
+          // Template parameters:
+          // {{1}} = Service / Program Title Upper (e.g. SPECIAL PROGRAM)
+          // {{2}} = Offset (e.g. UPCOMING)
+          // {{3}} = Member Name
+          // {{4}} = Service Name
+          // {{5}} = Date
+          // {{6}} = Time
+          // {{7}} = Scripture / Verse
           const params = [
-            title,
-            program_date || 'Upcoming Service',
-            member.full_name || 'Valued Member',
+            (title || 'SPECIAL PROGRAM').toUpperCase(),
+            'UPCOMING',
+            memberFirstName,
+            title || 'Special Program',
+            program_date || 'Upcoming Date',
+            start_time || '6:00 PM',
+            scripture ? `"${scripture}"` : '"For I know the thoughts that I think toward you, saith the Lord, thoughts of peace, and not of evil, to give you an expected end." — Jeremiah 29:11',
           ];
 
           let res = await sendMetaTemplateDirect(phoneNumberId, whatsappToken, formattedPhone, 'service_reminder', 'en', params);
