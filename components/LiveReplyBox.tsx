@@ -475,13 +475,13 @@ export default function LiveReplyBox({ conversationId, memberPhone, memberName }
                     </span>
                   ) : selectedTemplate === 'service_reminder' ? (
                     <div>
-                      🔔 Hello REMINDER: <strong>{remTitleUpper || '{{1}}'}</strong> — <strong>{remOffset || '{{2}}'}</strong>!
+                      🔔 REMINDER: <strong>{remTitleUpper || '{{1}}'}</strong> — <strong>{remOffset || '{{2}}'}</strong>!
                       <br /><br />
                       Dear <strong>{remMemberName || '{{3}}'}</strong>, this is a reminder for our upcoming service.
                       <br /><br />
-                      • Service: <strong>{remServiceName || '{{4}}'}</strong><br />
-                      • Date: <strong>{remDate || '{{5}}'}</strong><br />
-                      • Time: <strong>{remTime || '{{6}}'}</strong> WAT<br />
+                      - Service: <strong>{remServiceName || '{{4}}'}</strong><br />
+                      - Date: <strong>{remDate || '{{5}}'}</strong><br />
+                      - Time: <strong>{remTime || '{{6}}'}</strong> WAT<br />
                       📍 Address: 7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State.
                       <br /><br />
                       📖 Verse: <em>{remVerse || '{{7}}'}</em>
