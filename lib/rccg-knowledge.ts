@@ -10,12 +10,28 @@ export interface Hymn {
   verse_count?: number | null;
   author?: string;
   verses: string[];
+  refrain?: string;
 }
 
 export function searchHymn(query: string): Hymn | null {
   if (!query) return null;
   const clean = query.trim().toLowerCase();
 
+  // 1. Check for Anthem queries
+  if (clean.includes('sunday school') && (clean.includes('anthem') || clean.includes('hymn') || clean.includes('lyrics') || clean.includes('song'))) {
+    const found = hymnsData.find(h => h.title.toLowerCase().includes('sunday school anthem'));
+    if (found) return found as Hymn;
+  }
+  if ((clean.includes('redeem') || clean.includes('rccg')) && (clean.includes('anthem') || clean.includes('song'))) {
+    const found = hymnsData.find(h => h.title.toLowerCase().includes('rccg anthem'));
+    if (found) return found as Hymn;
+  }
+  if (clean.includes('house fellowship') && (clean.includes('anthem') || clean.includes('song'))) {
+    const found = hymnsData.find(h => h.title.toLowerCase().includes('house fellowship anthem'));
+    if (found) return found as Hymn;
+  }
+
+  // 2. Check by Hymn Number (e.g., "hymn 235", "235", "hymn #20")
   const numMatch = clean.match(/hymn\s*(?:no\.?|#)?\s*(\d+)|^\s*(\d+)\s*$/i);
   if (numMatch) {
     const targetNum = parseInt(numMatch[1] || numMatch[2], 10);
@@ -23,11 +39,13 @@ export function searchHymn(query: string): Hymn | null {
     if (found) return found as Hymn;
   }
 
+  // 3. Search exact/substring title match
   const foundByTitle = hymnsData.find(h =>
     h.title.toLowerCase().includes(clean) || clean.includes(h.title.toLowerCase())
   );
   if (foundByTitle) return foundByTitle as Hymn;
 
+  // 4. Search verse content / lyrics
   const foundByVerses = hymnsData.find(h =>
     Array.isArray(h.verses) && (h.verses as string[]).some((v: string) => v.toLowerCase().includes(clean))
   );
@@ -37,8 +55,9 @@ export function searchHymn(query: string): Hymn | null {
 }
 
 export function formatHymnResponse(hymn: Hymn): string {
-  let output = `🎵 *RCCG HYMN ${hymn.number}: ${hymn.title}*\n`;
-  if (hymn.category) {
+  const isAnthem = hymn.category === 'ANTHEM';
+  let output = isAnthem ? `🎵 *${hymn.title.toUpperCase()}*\n` : `🎵 *RCCG HYMN ${hymn.number}: ${hymn.title}*\n`;
+  if (hymn.category && !isAnthem) {
     output += `🏷️ *Category*: ${hymn.category}\n`;
   }
   if (hymn.scripture) {
@@ -46,11 +65,28 @@ export function formatHymnResponse(hymn: Hymn): string {
   }
   output += `\n`;
 
+  let extractedRefrain = hymn.refrain || '';
+
   if (hymn.verses && hymn.verses.length > 0) {
-    output += hymn.verses.map((v, i) => `*Verse ${i + 1}*\n${v}`).join('\n\n');
+    const cleanVerses = hymn.verses.map((v, i) => {
+      if (v.includes('[Refrain]')) {
+        const parts = v.split('[Refrain]');
+        if (!extractedRefrain && parts[1]) {
+          extractedRefrain = parts[1].trim();
+        }
+        return `*Verse ${i + 1}*\n${parts[0].trim()}`;
+      }
+      return isAnthem && hymn.verses.length === 1 ? v.trim() : `*Verse ${i + 1}*\n${v.trim()}`;
+    });
+
+    output += cleanVerses.join('\n\n');
+
+    if (extractedRefrain) {
+      output += `\n\n🔁 *Refrain / Chorus*:\n_${extractedRefrain}_`;
+    }
   } else {
     output += `_Official Entry in The Redeemed Hymnal (4th Edition), Hymn No. ${hymn.number}._\n\n` +
-              `*(Lyrics for this specific title are pending full transcription in the web database. Please consult your physical RCCG Hymnal book for the printed score.)*`;
+              `*(Lyrics for this title are printed in your physical RCCG Hymnal book.)*`;
   }
 
   return output;
@@ -65,16 +101,21 @@ export function getChurchLocationAndDirections(userQuery: string = ''): string {
     `🏢 *Physical Address*:\n` +
     `No. 7, Powerline Street, Moshalashi Bus Stop, Iyana Iyesi, Ota, Ogun State, Nigeria.\n\n` +
     `🗺️ *Live Google Maps Navigation*:\n` +
-    `Tap the link below to open Google Maps for real-time GPS turn-by-turn directions from your current location:\n\n` +
-    `👉 https://www.google.com/maps/dir/?api=1&destination=7+Powerline+Street+Moshalashi+Iyana+Iyesi+Ota\n\n` +
+    `👉 https://www.google.com.ng/maps/dir//RCCG+Everflourishing+Mega+Sanctuary,+7+Powerline+Street,+Iyana+Iyesi,+Ado+Odo%2FOta+112226,+Ogun+State/@6.6819397,3.1856563,17z\n\n` +
     `📌 *Google Maps Location Pin*:\n` +
-    `https://maps.google.com/?q=RCCG+Everflourishing+Mega+Sanctuary+Powerline+Street+Iyana+Iyesi+Ota\n\n` +
+    `https://maps.google.com/?q=6.6819397,3.1856563\n\n` +
     `God bless you as you come! We look forward to worshipping with you! 🙌`
   );
 }
 
 export function getRCCGInfo(query: string): string | null {
   const clean = query.trim().toLowerCase();
+
+  // Hymn search query
+  if (/hymn|showers of blessing|blessed assurance|song|lyrics|sing/i.test(clean)) {
+    const found = searchHymn(clean);
+    if (found) return formatHymnResponse(found);
+  }
 
   // Location / Directions query -> Google Maps
   if (/location|address|where|direction|find|map|ojuore|kola|iyana iyesi|moshalashi|powerline|get to church|navigate|gps/i.test(clean)) {
