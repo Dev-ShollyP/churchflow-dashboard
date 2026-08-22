@@ -1,513 +1,298 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardShell from '@/components/DashboardShell';
-import {
-  Search, BookOpen, Music, Copy, Check, X, Sparkles,
-  BookMarked, Plus, Upload, Trash2, ChevronDown
-} from 'lucide-react';
-import hymnsData from '@/lib/rccg-hymns.json';
-import { createClient } from '@/lib/supabase';
+import { createClient, getCurrentStaff, StaffMember } from '@/lib/supabase';
+import { getCombinedUpcomingEvents, getNextUpcomingService } from '@/lib/services';
+import { Users, MessageSquare, Heart, Calendar, TrendingUp, Clock, ArrowRight, Sparkles, MessageCircle, BookOpen } from 'lucide-react';
+import StatCard from '@/components/ui/StatCard';
+import EmptyState from '@/components/ui/EmptyState';
+import { format, parseISO } from 'date-fns';
+import Link from 'next/link';
 
-interface Hymn {
-  number: number;
-  title: string;
-  category?: string;
-  verses: string[];
-  refrain?: string;
-  scripture?: string;
-  isCustom?: boolean;
-  db_id?: string;
-}
-
-const supabase = createClient();
-
-async function loadCustomHymnsFromDB(): Promise<Hymn[]> {
-  try {
-    const { data, error } = await supabase
-      .from('custom_hymns')
-      .select('*')
-      .order('number', { ascending: true });
-    if (error || !data) return [];
-    return data.map((row: any) => ({
-      db_id: row.id,
-      number: row.number,
-      title: row.title,
-      category: row.category || 'GENERAL HYMNS',
-      scripture: row.scripture || undefined,
-      verses: Array.isArray(row.verses) ? row.verses : (row.verses ? JSON.parse(row.verses) : []),
-      refrain: row.refrain || undefined,
-      isCustom: true,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export default function HymnsPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedHymn, setSelectedHymn] = useState<Hymn | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
-  const [customHymns, setCustomHymns] = useState<Hymn[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
-
-  // Upload form state
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadCategory, setUploadCategory] = useState('GENERAL HYMNS');
-  const [uploadScripture, setUploadScripture] = useState('');
-  const [uploadRefrain, setUploadRefrain] = useState('');
-  const [uploadVerses, setUploadVerses] = useState('');
-  const [uploadSaving, setUploadSaving] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
+export default function OverviewPage() {
+  const [staff, setStaff] = useState<StaffMember | null>(null);
+  const [data, setData] = useState({
+    totalMembers: 0,
+    totalConversations: 0,
+    openConversations: 0,
+    totalMessages: 0,
+    pendingPrayers: 0,
+    upcomingEvents: [] as any[],
+    nextService: null as any,
+    recentConversations: [] as any[],
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCustomHymnsFromDB().then(setCustomHymns);
+    async function loadDashboardData() {
+      const supabase = createClient();
+
+      const [staffRes, membersRes, convsRes, msgsRes, prayersRes, eventsRes, recentConvsRes] = await Promise.all([
+        getCurrentStaff(),
+        supabase.from('members').select('id', { count: 'exact' }),
+        supabase.from('conversations').select('id, status', { count: 'exact' }),
+        supabase.from('messages').select('id', { count: 'exact' }),
+        supabase.from('prayer_requests').select('id', { count: 'exact' }).eq('status', 'pending'),
+        supabase.from('events').select('id, title, event_date, start_time, description').gte('event_date', new Date().toISOString().slice(0, 10)).order('event_date', { ascending: true }).limit(5),
+        supabase.from('conversations')
+          .select('id, status, started_at, members(full_name, phone)')
+          .order('started_at', { ascending: false })
+          .limit(6),
+      ]);
+
+      const openConvs = convsRes.data?.filter(c => c.status === 'open').length ?? 0;
+      const dbEvents = eventsRes.data ?? [];
+      const combinedUpcoming = getCombinedUpcomingEvents(dbEvents, 14);
+      const nextService = getNextUpcomingService(dbEvents);
+
+      setStaff(staffRes);
+      setData({
+        totalMembers: membersRes.count ?? membersRes.data?.length ?? 0,
+        totalConversations: convsRes.count ?? convsRes.data?.length ?? 0,
+        openConversations: openConvs,
+        totalMessages: msgsRes.count ?? msgsRes.data?.length ?? 0,
+        pendingPrayers: prayersRes.count ?? prayersRes.data?.length ?? 0,
+        upcomingEvents: combinedUpcoming.slice(0, 5),
+        nextService,
+        recentConversations: recentConvsRes.data ?? [],
+      });
+      setLoading(false);
+    }
+
+    loadDashboardData();
   }, []);
 
-  // Only include hymns that have lyrics
-  const baseHymns = (hymnsData as Hymn[]).filter(
-    h => Array.isArray(h.verses) && h.verses.length > 0 && h.verses.some(v => v && v.trim() !== '')
-  );
-
-  const allHymns = useMemo(() => {
-    const merged = [...baseHymns, ...customHymns.map(h => ({ ...h, isCustom: true }))];
-    return merged.sort((a, b) => a.number - b.number);
-  }, [baseHymns, customHymns]);
-
-  const categories = useMemo(() => {
-    const cats = new Set(allHymns.map(h => h.category || 'GENERAL').filter(Boolean));
-    return ['ALL', ...Array.from(cats)];
-  }, [allHymns]);
-
-  const filteredHymns = useMemo(() => {
-    let list = categoryFilter !== 'ALL'
-      ? allHymns.filter(h => (h.category || 'GENERAL') === categoryFilter)
-      : allHymns;
-
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return list;
-
-    const numQuery = parseInt(query, 10);
-    if (!isNaN(numQuery)) {
-      return list.filter(h => h.number === numQuery || h.number.toString().includes(query));
-    }
-
-    return list.filter(
-      h =>
-        h.title.toLowerCase().includes(query) ||
-        (Array.isArray(h.verses) && h.verses.some(v => v.toLowerCase().includes(query))) ||
-        (h.refrain && h.refrain.toLowerCase().includes(query))
-    );
-  }, [searchQuery, allHymns, categoryFilter]);
-
-  const handleCopy = (hymn: Hymn) => {
-    let fullText = `HYMN ${hymn.number} — ${hymn.title.toUpperCase()}\n\n`;
-    if (hymn.verses && hymn.verses.length > 0) {
-      hymn.verses.forEach((v, i) => {
-        fullText += `Verse ${i + 1}:\n${v}\n\n`;
-        if (hymn.refrain) fullText += `Refrain:\n${hymn.refrain}\n\n`;
-      });
-    }
-    if (hymn.scripture) fullText += `\n📖 ${hymn.scripture}`;
-    navigator.clipboard.writeText(fullText.trim());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
-  };
-
-  const handleDeleteCustom = async (number: number) => {
-    const hymn = customHymns.find(h => h.number === number);
-    if (hymn?.db_id) {
-      await supabase.from('custom_hymns').delete().eq('id', hymn.db_id);
-    }
-    const updated = customHymns.filter(h => h.number !== number);
-    setCustomHymns(updated);
-    setSelectedHymn(null);
-  };
-
-  const handleUpload = async () => {
-    if (!uploadTitle.trim() || !uploadVerses.trim()) return;
-    setUploadSaving(true);
-
-    const maxNum = allHymns.length > 0 ? Math.max(...allHymns.map(h => h.number)) : 0;
-    const verses = uploadVerses
-      .split(/\n\n+/)
-      .map(v => v.trim())
-      .filter(Boolean);
-
-    const insertRow = {
-      number: maxNum + 1,
-      title: uploadTitle.trim(),
-      category: uploadCategory,
-      scripture: uploadScripture.trim() || null,
-      verses: verses,
-      refrain: uploadRefrain.trim() || null,
-    };
-
-    const { data, error } = await supabase.from('custom_hymns').insert([insertRow]).select().single();
-
-    if (!error && data) {
-      const newHymn: Hymn = {
-        db_id: data.id,
-        number: data.number,
-        title: data.title,
-        category: data.category || 'GENERAL HYMNS',
-        scripture: data.scripture || undefined,
-        verses: data.verses || verses,
-        refrain: data.refrain || undefined,
-        isCustom: true,
-      };
-      setCustomHymns(prev => [...prev, newHymn]);
-    }
-
-    setUploadSaving(false);
-    setUploadSuccess(true);
-    setTimeout(() => {
-      setUploadSuccess(false);
-      setShowUpload(false);
-      setUploadTitle('');
-      setUploadCategory('GENERAL HYMNS');
-      setUploadScripture('');
-      setUploadRefrain('');
-      setUploadVerses('');
-    }, 1500);
-  };
-
-  const HYMN_CATEGORIES = [
-    'GENERAL HYMNS', 'MORNING HYMNS', 'EVENING HYMNS', 'PRAISE & WORSHIP',
-    'CHRISTMAS HYMNS', 'EASTER HYMNS', 'COMMUNION HYMNS', 'INVITATION HYMNS',
-    'CLOSING HYMNS', 'PRAYER HYMNS', 'YOUTH HYMNS'
-  ];
+  const todayStr = format(new Date(), 'EEEE, MMMM do yyyy');
+  const greetingName = staff?.full_name || staff?.email?.split('@')[0] || 'Sanctuary Team';
 
   return (
     <DashboardShell>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <BookOpen className="text-gold" size={28} />
-            Hymnal
-          </h1>
-          <p className="text-xs sm:text-sm text-white/50 mt-1">
-            {allHymns.length} hymns with full lyrics · {customHymns.length} custom uploads
-          </p>
-        </div>
+      {/* Hero Welcome Banner */}
+      <div
+        className="glass-card p-6 sm:p-8 md:p-10 mb-6 sm:mb-8 relative overflow-hidden transition-all"
+        style={{
+          background: 'radial-gradient(ellipse at 85% 15%, oklch(0.78 0.16 75 / 0.15) 0%, oklch(0.14 0.04 265 / 0.70) 70%)',
+        }}
+      >
+        {/* Ambient Radial Glow */}
+        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Category Filter */}
-          <div className="relative">
-            <select
-              value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
-              style={{ backgroundColor: '#091124', color: '#ffffff' }}
-              className="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-medium text-white border border-white/20 focus:border-gold/60 focus:outline-none cursor-pointer"
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gold/10 border border-gold/30 text-gold text-xs font-semibold mb-3">
+              <Sparkles size={13} />
+              <span>Ogun Province 27 • Everflourishing Sanctuary</span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
+              Welcome back, <span className="text-gold-gradient">{greetingName}</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-white/60 mt-1.5 font-medium">
+              {todayStr} • Live WhatsApp assistant &amp; church operations activity.
+            </p>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Link
+              href="/hymns"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold btn-gold shadow-gold"
             >
-              {categories.map(cat => (
-                <option key={cat} value={cat} style={{ backgroundColor: '#0D1B3E' }}>{cat}</option>
-              ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+              <BookOpen size={16} />
+              <span>Hymnal</span>
+            </Link>
+            <Link
+              href="/conversations"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium btn-glass"
+            >
+              <MessageCircle size={16} className="text-gold" />
+              <span>WhatsApp Chats</span>
+            </Link>
+            <Link
+              href="/prayers"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium btn-glass"
+            >
+              <Heart size={16} className="text-gold" />
+              <span>Prayer Requests</span>
+            </Link>
           </div>
-
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Number or title..."
-              style={{ backgroundColor: '#091124', color: '#ffffff' }}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs text-white placeholder-white/40 border border-white/15 focus:border-gold/50 focus:outline-none transition-colors"
-            />
-          </div>
-
-          {/* Upload Button */}
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold btn-gold shadow-gold whitespace-nowrap"
-          >
-            <Plus size={14} />
-            Add Hymn
-          </button>
         </div>
       </div>
 
-      {/* Hymn Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredHymns.slice(0, 200).map(hymn => {
-          const snippet = hymn.verses[0]?.split('\n')[0] || '';
-          return (
-            <div
-              key={hymn.number}
-              onClick={() => setSelectedHymn(hymn)}
-              className="glass-card p-4 hover:border-gold/50 cursor-pointer transition-all duration-200 group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="w-9 h-9 rounded-xl bg-gold/10 border border-gold/30 text-gold font-bold text-xs flex items-center justify-center flex-shrink-0 group-hover:bg-gold group-hover:text-navy-dark transition-all">
-                    #{hymn.number}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {hymn.isCustom && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                        Custom
-                      </span>
-                    )}
-                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                      {hymn.verses.length}v
-                    </span>
-                  </div>
-                </div>
-                <h3 className="font-display font-semibold text-white text-sm leading-snug group-hover:text-gold transition-colors line-clamp-2">
-                  {hymn.title}
-                </h3>
-              </div>
-              <p className="text-[11px] text-white/40 mt-3 line-clamp-2 italic font-serif leading-relaxed">
-                &ldquo;{snippet}&rdquo;
-              </p>
-            </div>
-          );
-        })}
+      {/* Overview Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 mb-6 sm:mb-8">
+        <StatCard
+          label="Total Members"
+          value={loading ? '...' : data.totalMembers}
+          icon={Users}
+          sub="Registered contacts"
+          gold
+        />
+        <StatCard
+          label="Open Conversations"
+          value={loading ? '...' : data.openConversations}
+          icon={MessageSquare}
+          sub={`${data.totalConversations} total threads`}
+        />
+        <StatCard
+          label="Messages Exchanged"
+          value={loading ? '...' : data.totalMessages.toLocaleString()}
+          icon={TrendingUp}
+          sub="Bot & Staff total"
+        />
+        <StatCard
+          label="Pending Prayers"
+          value={loading ? '...' : data.pendingPrayers}
+          icon={Heart}
+          sub="Awaiting response"
+        />
       </div>
 
-      {filteredHymns.length === 0 && (
-        <div className="glass-card p-12 text-center text-white/40 text-sm">
-          No hymns found matching &ldquo;{searchQuery}&rdquo;. Try searching by number or keywords.
-        </div>
-      )}
+      {/* Two-Column Section: Recent Conversations & Upcoming Events */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-      {filteredHymns.length > 200 && (
-        <p className="text-center text-xs text-white/30 mt-6">
-          Showing 200 of {filteredHymns.length} results. Refine your search to see more.
-        </p>
-      )}
-
-      {/* Upload Modal */}
-      {showUpload && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div
-            style={{ backgroundColor: '#0D1B3E', maxHeight: '90vh' }}
-            className="w-full max-w-lg flex flex-col animate-slide-up rounded-2xl border border-gold/40 shadow-2xl overflow-hidden"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Upload size={18} className="text-gold" />
-                <h3 className="font-display font-semibold text-white text-base">Add New Hymn</h3>
-              </div>
-              <button onClick={() => setShowUpload(false)} className="text-white/40 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Scrollable body */}
-            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-semibold text-gold/90 mb-1.5 uppercase tracking-wide">
-                  Hymn Title *
-                </label>
-                <input
-                  type="text"
-                  value={uploadTitle}
-                  onChange={e => setUploadTitle(e.target.value)}
-                  placeholder="e.g. Amazing Grace"
-                  style={{ backgroundColor: '#091124', color: '#ffffff' }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-white/30 border border-white/20 focus:border-gold/60 focus:outline-none"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-xs font-semibold text-gold/90 mb-1.5 uppercase tracking-wide">
-                  Category
-                </label>
-                <select
-                  value={uploadCategory}
-                  onChange={e => setUploadCategory(e.target.value)}
-                  style={{ backgroundColor: '#091124', color: '#ffffff' }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm text-white border border-white/20 focus:border-gold/60 focus:outline-none cursor-pointer"
-                >
-                  {HYMN_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat} style={{ backgroundColor: '#0D1B3E' }}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Scripture */}
-              <div>
-                <label className="block text-xs font-semibold text-gold/90 mb-1.5 uppercase tracking-wide">
-                  Scripture Reference (optional)
-                </label>
-                <input
-                  type="text"
-                  value={uploadScripture}
-                  onChange={e => setUploadScripture(e.target.value)}
-                  placeholder="e.g. Psalm 100:4"
-                  style={{ backgroundColor: '#091124', color: '#ffffff' }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-white/30 border border-white/20 focus:border-gold/60 focus:outline-none"
-                />
-              </div>
-
-              {/* Verses */}
-              <div>
-                <label className="block text-xs font-semibold text-gold/90 mb-1.5 uppercase tracking-wide">
-                  Verses * <span className="normal-case text-white/40 font-normal">(separate each verse with a blank line)</span>
-                </label>
-                <textarea
-                  value={uploadVerses}
-                  onChange={e => setUploadVerses(e.target.value)}
-                  placeholder={"Verse 1 line 1\nVerse 1 line 2\n\nVerse 2 line 1\nVerse 2 line 2"}
-                  rows={10}
-                  style={{ backgroundColor: '#091124', color: '#ffffff' }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-white/30 border border-white/20 focus:border-gold/60 focus:outline-none resize-y font-mono leading-relaxed"
-                />
-              </div>
-
-              {/* Refrain */}
-              <div>
-                <label className="block text-xs font-semibold text-gold/90 mb-1.5 uppercase tracking-wide">
-                  Refrain / Chorus (optional)
-                </label>
-                <textarea
-                  value={uploadRefrain}
-                  onChange={e => setUploadRefrain(e.target.value)}
-                  placeholder="Hallelujah! Hallelujah! ..."
-                  rows={3}
-                  style={{ backgroundColor: '#091124', color: '#ffffff' }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-white/30 border border-white/20 focus:border-gold/60 focus:outline-none resize-y"
-                />
-              </div>
-
-              {/* Preview */}
-              {uploadVerses.trim() && (
-                <div className="p-4 rounded-xl bg-black/40 border border-white/10">
-                  <p className="text-xs font-bold text-white/50 uppercase tracking-wide mb-2">Preview</p>
-                  <p className="text-xs text-white/70 font-bold">{uploadTitle || 'Untitled Hymn'}</p>
-                  <p className="text-xs text-white/50 mt-1 whitespace-pre-line">
-                    {uploadVerses.split(/\n\n+/)[0]?.split('\n').slice(0, 2).join('\n')}...
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div
-              className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-white/10 flex-shrink-0"
-              style={{ backgroundColor: '#0D1B3E' }}
+        {/* Recent Conversations */}
+        <div className="glass-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/10 bg-white/5">
+            <h2 className="font-display font-semibold text-white text-xs sm:text-sm flex items-center gap-2">
+              <MessageSquare size={17} className="text-gold" /> Recent Conversations
+            </h2>
+            <Link
+              href="/conversations"
+              className="text-xs text-gold hover:text-gold-light transition-colors flex items-center gap-1 group font-medium"
             >
-              <button
-                onClick={() => setShowUpload(false)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-white/50 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpload}
-                disabled={!uploadTitle.trim() || !uploadVerses.trim() || uploadSaving}
-                className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploadSaving ? (
-                  <div className="w-3.5 h-3.5 border-2 border-navy-dark/30 border-t-navy-dark rounded-full animate-spin" />
-                ) : uploadSuccess ? (
-                  <Check size={14} />
-                ) : (
-                  <Plus size={14} />
-                )}
-                {uploadSuccess ? 'Hymn Added!' : uploadSaving ? 'Saving...' : 'Add to Hymnal'}
-              </button>
-            </div>
+              View all <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+            </Link>
           </div>
-        </div>
-      )}
 
-      {/* Full Hymn Reader Modal */}
-      {selectedHymn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div
-            style={{ backgroundColor: '#0D1B3E', maxHeight: '90vh' }}
-            className="w-full max-w-2xl flex flex-col animate-slide-up rounded-2xl border border-gold/40 shadow-2xl overflow-hidden"
-          >
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-white/10 px-6 py-4 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <span className="w-11 h-11 rounded-2xl bg-gold text-navy-dark font-bold text-base flex items-center justify-center flex-shrink-0 shadow-gold">
-                  #{selectedHymn.number}
-                </span>
-                <div>
-                  <h2 className="font-display text-lg sm:text-xl font-bold text-white leading-tight">
-                    {selectedHymn.title}
-                  </h2>
-                  <p className="text-xs text-gold/70 mt-0.5 font-medium">
-                    {selectedHymn.isCustom ? 'Custom Upload' : 'Hymnal'} &bull; {selectedHymn.verses?.length} Verses
-                  </p>
-                  {selectedHymn.scripture && (
-                    <p className="text-[11px] text-white/40 italic mt-0.5">
-                      📖 {selectedHymn.scripture}
-                    </p>
-                  )}
-                </div>
+          <div className="divide-y divide-white/5">
+            {loading ? (
+              <div className="p-8 text-center text-white/40 text-sm">Loading live conversations...</div>
+            ) : data.recentConversations.length === 0 ? (
+              <div className="px-5 py-8">
+                <EmptyState
+                  icon={MessageSquare}
+                  title="No conversations yet"
+                  description="Member WhatsApp messages will automatically show up here."
+                />
               </div>
-              <button
-                onClick={() => setSelectedHymn(null)}
-                className="text-white/40 hover:text-white transition-colors p-1 flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
+            ) : (
+              data.recentConversations.map((conv: any) => {
+                const member = Array.isArray(conv.members) ? conv.members[0] : conv.members;
+                return (
+                  <Link
+                    key={conv.id}
+                    href={`/conversations/${conv.id}`}
+                    className="flex items-center gap-3.5 px-5 sm:px-6 py-3.5 table-row-hover group transition-colors block"
+                  >
+                    <div
+                      className="w-9 sm:w-10 h-9 sm:h-10 rounded-full flex items-center justify-center text-xs font-bold text-slate-950 flex-shrink-0 shadow-sm"
+                      style={{ background: 'linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold-dark))' }}
+                    >
+                      {(member?.full_name ?? '?')[0]?.toUpperCase() ?? '?'}
+                    </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-white/90 text-sm leading-relaxed font-serif">
-              {selectedHymn.verses.map((verse, idx) => (
-                <div key={idx} className="p-4 rounded-xl bg-black/30 border border-white/5">
-                  <p className="text-xs font-sans font-bold text-gold/80 mb-2 uppercase tracking-wide">
-                    Verse {idx + 1}
-                  </p>
-                  <p className="whitespace-pre-line text-white/90 leading-relaxed">
-                    {verse}
-                  </p>
-                  {selectedHymn.refrain && (
-                    <div className="mt-3 pt-3 border-t border-gold/20">
-                      <p className="text-xs font-sans text-gold/60 uppercase tracking-wide mb-1 flex items-center gap-1">
-                        <Music size={11} /> Refrain
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:text-gold transition-colors">
+                        {member?.full_name ?? 'Unknown Contact'}
                       </p>
-                      <p className="whitespace-pre-line italic text-gold-light/80 text-sm leading-relaxed">
-                        {selectedHymn.refrain}
+                      <p className="text-[11px] sm:text-xs text-white/40 truncate">{member?.phone}</p>
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <span
+                        className={`inline-block w-2.5 h-2.5 rounded-full mb-1 ${
+                          conv.status === 'open'
+                            ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
+                            : 'bg-white/20'
+                        }`}
+                      />
+                      <p className="text-[10px] text-white/40 block">
+                        {conv.started_at ? format(parseISO(conv.started_at), 'MMM d') : ''}
                       </p>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between border-t border-white/10 px-6 py-4 flex-shrink-0" style={{ backgroundColor: '#0D1B3E' }}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-white/40">RCCG Everflourishing Sanctuary</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedHymn.isCustom && (
-                  <button
-                    onClick={() => handleDeleteCustom(selectedHymn.number)}
-                    className="px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center gap-1.5 transition-colors"
-                  >
-                    <Trash2 size={13} />
-                    Remove
-                  </button>
-                )}
-                <button
-                  onClick={() => handleCopy(selectedHymn)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold flex items-center gap-1.5"
-                >
-                  {copied ? <Check size={15} /> : <Copy size={15} />}
-                  {copied ? 'Copied!' : 'Copy Hymn'}
-                </button>
-              </div>
-            </div>
+                  </Link>
+                );
+              })
+            )}
           </div>
         </div>
-      )}
+
+        {/* Next Upcoming Service */}
+        <div className="glass-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/10 bg-white/5">
+            <h2 className="font-display font-semibold text-white text-xs sm:text-sm flex items-center gap-2">
+              <Calendar size={17} className="text-gold" /> Next Upcoming Service
+            </h2>
+            <Link
+              href="/events"
+              className="text-xs text-gold hover:text-gold-light transition-colors flex items-center gap-1 group font-medium"
+            >
+              All events <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+
+          <div className="p-5 sm:p-6">
+            {loading ? (
+              <div className="text-center text-white/40 text-sm py-6">Loading next service...</div>
+            ) : !data.nextService ? (
+              <EmptyState
+                icon={Calendar}
+                title="No upcoming service found"
+                description="Check back soon — weekly services are calculated automatically."
+              />
+            ) : (
+              <div
+                className="rounded-2xl p-5 sm:p-6 relative overflow-hidden"
+                style={{
+                  background: 'radial-gradient(ellipse at 80% 20%, oklch(0.78 0.16 75 / 0.12) 0%, oklch(0.11 0.04 265 / 0.70) 70%)',
+                  border: '1px solid oklch(0.78 0.16 75 / 0.25)',
+                }}
+              >
+                {/* Glow accent */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-gold/8 blur-3xl pointer-events-none" />
+
+                {/* Date Badge */}
+                <div className="flex items-start gap-4">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 shadow-gold"
+                    style={{
+                      background: 'linear-gradient(135deg, oklch(0.78 0.16 75), oklch(0.65 0.18 65))',
+                    }}
+                  >
+                    <span className="text-slate-950 text-xl font-black leading-none">
+                      {format(new Date(data.nextService.event_date + 'T12:00:00'), 'd')}
+                    </span>
+                    <span className="text-slate-900 text-[9px] uppercase font-bold tracking-wide leading-none mt-0.5">
+                      {format(new Date(data.nextService.event_date + 'T12:00:00'), 'MMM')}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-white text-sm sm:text-base leading-tight">
+                      {data.nextService.title}
+                    </p>
+                    {data.nextService.description && (
+                      <p className="text-xs text-white/55 mt-1 leading-relaxed">
+                        {data.nextService.description.replace(/\[FLYER:\s*[^\]]+\]/gi, '').replace(/\[SCRIPTURE:\s*[^\]]+\]/gi, '').trim()}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 mt-3 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gold">
+                        <Clock size={12} /> {data.nextService.start_time}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] text-white/40">
+                        {format(new Date(data.nextService.event_date + 'T12:00:00'), 'EEEE, MMMM do')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
     </DashboardShell>
   );
 }
