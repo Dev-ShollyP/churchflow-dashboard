@@ -140,7 +140,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Navigation Items */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Sidebar navigation">
           {filteredNavItems.map(({ href, label, icon: Icon }) => {
-            const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+            const currentPath = pathname || '/';
+            const isActive = href === '/'
+              ? currentPath === '/'
+              : href === '/events'
+                ? currentPath === '/events'
+                : currentPath.startsWith(href);
+
             return (
               <Link
                 key={href}
