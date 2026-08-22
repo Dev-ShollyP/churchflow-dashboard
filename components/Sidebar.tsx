@@ -80,7 +80,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Logo Header */}
         <div className="flex items-center justify-between px-5 py-4 sm:py-5 border-b border-white/10">
-          <div className="flex items-center gap-3">
+          <Link href="/" onClick={onClose} className="flex items-center gap-3 hover:opacity-90 transition-opacity">
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-gold"
               style={{ background: 'linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold-dark))' }}
@@ -91,7 +91,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <p className="font-display font-bold text-sm text-gold leading-tight tracking-wide">RCCG EVF</p>
               <p className="text-[10px] text-white/50 leading-tight truncate">Everflourishing Sanctuary</p>
             </div>
-          </div>
+          </Link>
 
           <button
             onClick={onClose}
