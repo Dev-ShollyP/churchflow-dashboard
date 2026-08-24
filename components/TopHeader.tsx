@@ -83,6 +83,15 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
       setAudioEnabled(savedPref === 'true');
     }
 
+    try {
+      const savedNotifs = localStorage.getItem('churchflow_notifications');
+      if (savedNotifs) {
+        const parsed: NotificationAlert[] = JSON.parse(savedNotifs);
+        setNotifications(parsed);
+        parsed.forEach(n => seenMessageIds.current.add(n.id));
+      }
+    } catch {}
+
     const unlockAudio = () => {
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -125,7 +134,11 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
       isHumanRequest: isHuman,
     };
 
-    setNotifications(prev => [newNotif, ...prev.slice(0, 19)]);
+    setNotifications(prev => {
+      const next = [newNotif, ...prev.slice(0, 19)];
+      try { localStorage.setItem('churchflow_notifications', JSON.stringify(next)); } catch {}
+      return next;
+    });
     setActiveToast(newNotif);
 
     setTimeout(() => {
@@ -388,7 +401,10 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
                 </h4>
                 {notifications.length > 0 && (
                   <button
-                    onClick={() => setNotifications([])}
+                    onClick={() => {
+                      setNotifications([]);
+                      try { localStorage.removeItem('churchflow_notifications'); } catch {}
+                    }}
                     className="text-[10px] text-white/40 hover:text-white transition-colors"
                   >
                     Clear All
