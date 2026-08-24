@@ -54,7 +54,7 @@ export default async function ConversationThreadPage({ params }: { params: Promi
       </div>
 
       {/* Message Thread Box with Auto-scroll & WhatsApp Double Ticks */}
-      <ConversationThreadBox messages={messages} />
+      <ConversationThreadBox messages={messages} conversationId={resolvedParams.id} />
 
       {/* Live Staff WhatsApp Reply Box */}
       <LiveReplyBox
