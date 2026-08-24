@@ -78,7 +78,7 @@ export const WEEKLY_SERVICES = [
     endTime: '19:00',
     location: 'Main Sanctuary',
     description: 'Intercession, Divine Healing & Deliverance Service',
-    flyerUrl: STORAGE_BASE + '/Service/Faith%20Clinic.jpeg',
+    flyerUrl: STORAGE_BASE + '/Service/faith%20clinic.jpg',
   },
   {
     dayOfWeek: 0, // Sunday
@@ -138,6 +138,34 @@ export function getNextUpcomingService(customDbEvents: ChurchEvent[] = []): Chur
         category: 'recurring',
         is_recurring: true,
       };
+    }
+
+    // Check Monthly Youth Vigil (Last Wednesday)
+    if (dayOfWeek === 3) {
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth();
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+      const diff = (lastDayOfMonth.getDay() - 3 + 7) % 7;
+      const lastWedDay = lastDayOfMonth.getDate() - diff;
+
+      if (targetDate.getDate() === lastWedDay) {
+        const vigilEnd = setMinutes(setHours(addDays(targetDate, 1), 4), 0);
+        if (i > 0 || isAfter(vigilEnd, now)) {
+          return {
+            id: `recurring-youth-vigil-${dateStr}`,
+            title: 'Youth Vigil (YAYA Vigil)',
+            event_date: dateStr,
+            start_time: '23:00',
+            end_time: '04:00',
+            location: 'Main Sanctuary',
+            description: 'Night of Supernatural Encounter, Worship, Intercession & Spiritual Fire',
+            image_url: STORAGE_BASE + '/Service/Youth%20vigil.jpg',
+            flyer_url: STORAGE_BASE + '/Service/Youth%20vigil.jpg',
+            category: 'recurring',
+            is_recurring: true,
+          };
+        }
+      }
     }
   }
 
@@ -207,6 +235,34 @@ export function getCombinedUpcomingEvents(customDbEvents: ChurchEvent[] = [], da
         }
       }
     });
+
+    // Monthly Youth Vigil (YAYA Vigil) on the Last Wednesday of the month
+    if (dayOfWeek === 3) {
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth();
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+      const diff = (lastDayOfMonth.getDay() - 3 + 7) % 7;
+      const lastWedDay = lastDayOfMonth.getDate() - diff;
+
+      if (targetDate.getDate() === lastWedDay) {
+        const vigilEnd = setMinutes(setHours(addDays(targetDate, 1), 4), 0);
+        if (isAfter(vigilEnd, now) || !isSameDay(targetDate, now)) {
+          recurringEvents.push({
+            id: `recurring-youth-vigil-${dateStr}`,
+            title: 'Youth Vigil (YAYA Vigil)',
+            event_date: dateStr,
+            start_time: '23:00',
+            end_time: '04:00',
+            location: 'Main Sanctuary',
+            description: 'Night of Supernatural Encounter, Worship, Intercession & Spiritual Fire',
+            image_url: STORAGE_BASE + '/Service/Youth%20vigil.jpg',
+            flyer_url: STORAGE_BASE + '/Service/Youth%20vigil.jpg',
+            category: 'recurring',
+            is_recurring: true,
+          });
+        }
+      }
+    }
   }
 
   const combined: ChurchEvent[] = [];
