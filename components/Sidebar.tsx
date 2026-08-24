@@ -38,9 +38,33 @@ const navItems: NavItem[] = [
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [staff, setStaff] = useState<StaffMember | null>(null);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
     getCurrentStaff().then(setStaff);
+
+    const updateUnread = () => {
+      try {
+        const raw = localStorage.getItem('churchflow_notifications_v2');
+        if (raw) {
+          const list = JSON.parse(raw);
+          setUnreadCount(Array.isArray(list) ? list.length : 0);
+        } else {
+          setUnreadCount(0);
+        }
+      } catch {
+        setUnreadCount(0);
+      }
+    };
+
+    updateUnread();
+    window.addEventListener('storage', updateUnread);
+    const interval = setInterval(updateUnread, 4000);
+
+    return () => {
+      window.removeEventListener('storage', updateUnread);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -80,7 +104,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Logo Header */}
         <div className="flex items-center justify-between px-5 py-4 sm:py-5 border-b border-white/10">
-          <Link href="/" onClick={onClose} className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+          <div className="flex items-center gap-3">
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-gold"
               style={{ background: 'linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold-dark))' }}
@@ -91,7 +115,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <p className="font-display font-bold text-sm text-gold leading-tight tracking-wide">RCCG EVF</p>
               <p className="text-[10px] text-white/50 leading-tight truncate">Everflourishing Sanctuary</p>
             </div>
-          </Link>
+          </div>
 
           <button
             onClick={onClose}
@@ -147,12 +171,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 ? currentPath === '/events'
                 : currentPath.startsWith(href);
 
+            const showBadge = href === '/conversations' && unreadCount > 0;
+
             return (
               <Link
                 key={href}
                 href={href}
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-150 ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-150 relative ${
                   isActive
                     ? 'nav-active font-semibold'
                     : 'text-white/60 hover:text-white hover:bg-white/5'
@@ -160,7 +186,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               >
                 <Icon size={18} className={isActive ? 'text-gold' : 'text-white/40 group-hover:text-white/80'} />
                 <span className="flex-1 truncate">{label}</span>
-                {isActive && <ChevronRight size={14} className="text-gold/70" />}
+                {showBadge && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] min-w-[18px] text-center shadow-lg shadow-emerald-500/40 animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+                {isActive && !showBadge && <ChevronRight size={14} className="text-gold/70" />}
               </Link>
             );
           })}

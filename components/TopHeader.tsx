@@ -247,6 +247,79 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
     if (activeToast?.id === id) {
       setActiveToast(null);
     }
+  };
+
+  const toggleAudio = () => {
+    const nextState = !audioEnabled;
+    setAudioEnabled(nextState);
+    localStorage.setItem('churchflow_chime_enabled', String(nextState));
+    if (nextState) {
+      playChimeSound();
+    }
+  };
+
+  // Perform real-time search across members & messages
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (!val.trim()) {
+      setSearchResults([]);
+      setShowSearchPopover(false);
+      return;
+    }
+
+    setShowSearchPopover(true);
+    setIsSearching(true);
+
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    searchDebounceRef.current = setTimeout(async () => {
+      const supabase = createClient();
+      const term = val.trim();
+      const results: SearchResultItem[] = [];
+
+      // 1. Search Members
+      const { data: members } = await supabase
+        .from('members')
+        .select('id, full_name, phone, email')
+        .or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`)
+        .limit(5);
+
+      if (members) {
+        members.forEach(m => {
+          results.push({
+            id: `member-${m.id}`,
+            type: 'member',
+            title: m.full_name || 'Member',
+            subtitle: `Phone: ${m.phone || 'N/A'} • ${m.email || ''}`,
+            url: `/members?search=${encodeURIComponent(m.full_name || m.phone || '')}`,
+          });
+        });
+      }
+
+      // 2. Search Conversations / Messages
+      const { data: messages } = await supabase
+        .from('messages')
+        .select('id, conversation_id, message, created_at')
+        .ilike('message', `%${term}%`)
+        .limit(5);
+
+      if (messages) {
+        messages.forEach(msg => {
+          results.push({
+            id: `msg-${msg.id}`,
+            type: 'conversation',
+            title: `Chat: "${msg.message.slice(0, 40)}${msg.message.length > 40 ? '...' : ''}"`,
+            subtitle: `Message snippet`,
+            url: `/conversations/${msg.conversation_id}`,
+          });
+        });
+      }
+
+      setSearchResults(results);
+      setIsSearching(false);
+    }, 250);
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
