@@ -33,6 +33,7 @@ interface ConversationItem {
 }
 
 const READ_CONVERSATIONS_KEY = 'churchflow_read_conv_timestamps_v1';
+const RESOLVED_HUMAN_REQUESTS_KEY = 'churchflow_resolved_human_requests_v1';
 
 function getReadTimestamps(): Record<string, string> {
   if (typeof window === 'undefined') return {};
@@ -44,12 +45,40 @@ function getReadTimestamps(): Record<string, string> {
   }
 }
 
+function getResolvedHumanRequests(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(RESOLVED_HUMAN_REQUESTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 function markConversationAsReadInStorage(convId: string, timestampISO?: string) {
   if (typeof window === 'undefined') return;
   try {
-    const map = getReadTimestamps();
-    map[convId] = timestampISO || new Date().toISOString();
-    localStorage.setItem(READ_CONVERSATIONS_KEY, JSON.stringify(map));
+    const nowISO = timestampISO || new Date().toISOString();
+    
+    // 1. Mark read timestamp
+    const readMap = getReadTimestamps();
+    readMap[convId] = nowISO;
+    localStorage.setItem(READ_CONVERSATIONS_KEY, JSON.stringify(readMap));
+
+    // 2. Mark human request resolved
+    const resolvedMap = getResolvedHumanRequests();
+    resolvedMap[convId] = nowISO;
+    localStorage.setItem(RESOLVED_HUMAN_REQUESTS_KEY, JSON.stringify(resolvedMap));
+
+    // 3. Clear header notifications
+    const rawNotifs = localStorage.getItem('churchflow_notifications_v2');
+    if (rawNotifs) {
+      const notifs = JSON.parse(rawNotifs);
+      const filtered = notifs.filter((n: any) => n.conversationId !== convId);
+      localStorage.setItem('churchflow_notifications_v2', JSON.stringify(filtered));
+    }
+
+    window.dispatchEvent(new Event('storage'));
   } catch {}
 }
 
@@ -103,6 +132,7 @@ export default function ConversationsPage() {
           .order('created_at', { ascending: false });
 
         const readMap = getReadTimestamps();
+        const resolvedMap = getResolvedHumanRequests();
 
         if (messages) {
           messages.forEach(m => {
@@ -115,6 +145,7 @@ export default function ConversationsPage() {
             }
 
             const readAfter = readMap[m.conversation_id] ? new Date(readMap[m.conversation_id]).getTime() : 0;
+            const resolvedAfter = resolvedMap[m.conversation_id] ? new Date(resolvedMap[m.conversation_id]).getTime() : 0;
             const msgTime = new Date(m.created_at).getTime();
 
             // Count unread incoming member messages
@@ -122,8 +153,14 @@ export default function ConversationsPage() {
               messageMap[m.conversation_id].unreadCount += 1;
             }
 
-            // Check for human assistance triggers
-            if (m.sender === 'member' && /pastor|human|talk|speak|help|counsel|prayer|urgent|deacon/i.test(m.message || '')) {
+            // Check for unhandled human assistance triggers:
+            // Must be sent by member AFTER the last read/resolved time
+            if (
+              m.sender === 'member' &&
+              msgTime > readAfter &&
+              msgTime > resolvedAfter &&
+              /pastor|human|talk|speak|help|counsel|prayer|urgent|deacon/i.test(m.message || '')
+            ) {
               messageMap[m.conversation_id].isHumanRequest = true;
             }
           });
@@ -146,11 +183,11 @@ export default function ConversationsPage() {
           },
           lastMessage: msgInfo?.lastMessage,
           unreadCount: msgInfo?.unreadCount ?? 0,
-          isHumanRequest: msgInfo?.isHumanRequest ?? false,
+          isHumanRequest: (msgInfo?.isHumanRequest ?? false) && c.status === 'open',
         };
       });
 
-      // Sort: Conversations with recent unread messages or recent activity first
+      // Sort: Conversations with recent activity first
       formatted.sort((a, b) => {
         const timeA = new Date(a.lastMessage?.created_at || a.started_at).getTime();
         const timeB = new Date(b.lastMessage?.created_at || b.started_at).getTime();
@@ -168,9 +205,15 @@ export default function ConversationsPage() {
   useEffect(() => {
     fetchConversationsData();
 
+    // Listen to local storage changes from conversation thread page
+    const handleStorage = () => {
+      fetchConversationsData();
+    };
+    window.addEventListener('storage', handleStorage);
+
     // Realtime listener for incoming messages
     const channel = supabase
-      .channel('conversations_realtime_list')
+      .channel('conversations_realtime_list_v2')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -188,6 +231,7 @@ export default function ConversationsPage() {
       .subscribe();
 
     return () => {
+      window.removeEventListener('storage', handleStorage);
       supabase.removeChannel(channel);
     };
   }, [supabase]);
@@ -197,13 +241,32 @@ export default function ConversationsPage() {
     conversations.forEach(c => {
       markConversationAsReadInStorage(c.id, nowISO);
     });
-    setConversations(prev => prev.map(c => ({ ...c, unreadCount: 0 })));
+    setConversations(prev => prev.map(c => ({ ...c, unreadCount: 0, isHumanRequest: false })));
+  };
+
+  const handleResolveAllHuman = () => {
+    const nowISO = new Date().toISOString();
+    conversations.forEach(c => {
+      if (c.isHumanRequest) {
+        markConversationAsReadInStorage(c.id, nowISO);
+      }
+    });
+    setConversations(prev => prev.map(c => ({ ...c, isHumanRequest: false })));
   };
 
   const handleOpenConversation = (convId: string, latestMsgTime?: string) => {
     markConversationAsReadInStorage(convId, latestMsgTime || new Date().toISOString());
     setConversations(prev =>
-      prev.map(c => (c.id === convId ? { ...c, unreadCount: 0 } : c))
+      prev.map(c => (c.id === convId ? { ...c, unreadCount: 0, isHumanRequest: false } : c))
+    );
+  };
+
+  const handleResolveSingleHuman = (convId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    markConversationAsReadInStorage(convId);
+    setConversations(prev =>
+      prev.map(c => (c.id === convId ? { ...c, isHumanRequest: false, unreadCount: 0 } : c))
     );
   };
 
@@ -252,15 +315,27 @@ export default function ConversationsPage() {
           subtitle={`${conversations.filter(c => c.status === 'open').length} active threads • Real-time WhatsApp sync`}
         />
 
-        {totalUnread > 0 && (
-          <button
-            onClick={handleMarkAllAsRead}
-            className="self-start md:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gold/10 hover:bg-gold/20 border border-gold/30 text-gold text-xs font-semibold transition-all shadow-sm"
-          >
-            <CheckCircle2 size={14} />
-            <span>Mark All as Read ({totalUnread})</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {totalUnread > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              className="self-start md:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gold/10 hover:bg-gold/20 border border-gold/30 text-gold text-xs font-semibold transition-all shadow-sm"
+            >
+              <CheckCircle2 size={14} />
+              <span>Mark All as Read ({totalUnread})</span>
+            </button>
+          )}
+
+          {humanHelpCount > 0 && (
+            <button
+              onClick={handleResolveAllHuman}
+              className="self-start md:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-semibold transition-all shadow-sm"
+            >
+              <CheckCircle2 size={14} />
+              <span>Resolve All Pastor Requests ({humanHelpCount})</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Control Bar: Search & Filter Tabs */}
@@ -418,10 +493,15 @@ export default function ConversationsPage() {
                         </p>
 
                         {conv.isHumanRequest && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/20 border border-red-500/40 text-red-300 flex-shrink-0 animate-pulse">
+                          <button
+                            onClick={(e) => handleResolveSingleHuman(conv.id, e)}
+                            title="Click to resolve and clear Needs Pastor badge"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-300 flex-shrink-0 animate-pulse transition-all cursor-pointer group/btn"
+                          >
                             <AlertCircle size={10} />
                             <span>Needs Pastor</span>
-                          </span>
+                            <span className="opacity-70 group-hover/btn:opacity-100 hover:text-white font-normal ml-0.5">✕</span>
+                          </button>
                         )}
                       </div>
 
