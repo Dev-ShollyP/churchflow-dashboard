@@ -60,6 +60,54 @@ function playChimeSound() {
   } catch (e) {}
 }
 
+const NOTIFS_STORAGE_KEY = 'churchflow_notifications_v2';
+const CLEARED_IDS_STORAGE_KEY = 'churchflow_cleared_msg_ids_v2';
+
+function getStoredNotifications(): NotificationAlert[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(NOTIFS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredNotifications(notifs: NotificationAlert[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(NOTIFS_STORAGE_KEY, JSON.stringify(notifs.slice(0, 30)));
+  } catch {}
+}
+
+function getClearedMessageIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(CLEARED_IDS_STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function addClearedMessageId(id: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const ids = getClearedMessageIds();
+    ids.add(id);
+    localStorage.setItem(CLEARED_IDS_STORAGE_KEY, JSON.stringify(Array.from(ids).slice(-300)));
+  } catch {}
+}
+
+function addMultipleClearedMessageIds(idList: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const ids = getClearedMessageIds();
+    idList.forEach(id => ids.add(id));
+    localStorage.setItem(CLEARED_IDS_STORAGE_KEY, JSON.stringify(Array.from(ids).slice(-300)));
+  } catch {}
+}
+
 export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
   const router = useRouter();
   const [staff, setStaff] = useState<StaffMember | null>(null);
@@ -74,23 +122,40 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchPopover, setShowSearchPopover] = useState(false);
 
-  const seenMessageIds = useRef<Set<string>>(new Set());
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize notifications from localStorage on mount and register storage sync
+  useEffect(() => {
+    const savedNotifs = getStoredNotifications();
+    if (savedNotifs.length > 0) {
+      setNotifications(savedNotifs);
+    }
+
+    // Sync across browser tabs
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === NOTIFS_STORAGE_KEY) {
+        try {
+          setNotifications(e.newValue ? JSON.parse(e.newValue) : []);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // Request desktop notification permission for background alerts
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   useEffect(() => {
     const savedPref = localStorage.getItem('churchflow_chime_enabled');
     if (savedPref !== null) {
       setAudioEnabled(savedPref === 'true');
     }
-
-    try {
-      const savedNotifs = localStorage.getItem('churchflow_notifications');
-      if (savedNotifs) {
-        const parsed: NotificationAlert[] = JSON.parse(savedNotifs);
-        setNotifications(parsed);
-        parsed.forEach(n => seenMessageIds.current.add(n.id));
-      }
-    } catch {}
 
     const unlockAudio = () => {
       try {
@@ -114,109 +179,74 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
     };
   }, []);
 
-  const handleNewMemberMessage = (newMsg: any) => {
+  const handleNewMemberMessage = (newMsg: any, playAudio: boolean = true) => {
     if (!newMsg || newMsg.sender !== 'member') return;
-    if (seenMessageIds.current.has(newMsg.id)) return;
-    
-    seenMessageIds.current.add(newMsg.id);
-
-    if (audioEnabled) {
-      playChimeSound();
-    }
-
-    const isHuman = /pastor|human|talk|speak|help|counsel|prayer|urgent|deacon/i.test(newMsg.message || '');
-    const newNotif: NotificationAlert = {
-      id: newMsg.id || Math.random().toString(),
-      conversationId: newMsg.conversation_id,
-      senderName: 'Member',
-      messageText: newMsg.message,
-      time: new Date(newMsg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isHumanRequest: isHuman,
-    };
+    const clearedIds = getClearedMessageIds();
+    if (clearedIds.has(newMsg.id)) return;
 
     setNotifications(prev => {
-      const next = [newNotif, ...prev.slice(0, 19)];
-      try { localStorage.setItem('churchflow_notifications', JSON.stringify(next)); } catch {}
-      return next;
+      if (prev.some(n => n.id === newMsg.id)) return prev;
+
+      const isHuman = /pastor|human|talk|speak|help|counsel|prayer|urgent|deacon/i.test(newMsg.message || '');
+      const newNotif: NotificationAlert = {
+        id: newMsg.id || Math.random().toString(),
+        conversationId: newMsg.conversation_id,
+        senderName: newMsg.sender_name || 'Member',
+        messageText: newMsg.message,
+        time: new Date(newMsg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isHumanRequest: isHuman,
+      };
+
+      const updated = [newNotif, ...prev.slice(0, 29)];
+      saveStoredNotifications(updated);
+
+      if (playAudio && audioEnabled) {
+        playChimeSound();
+      }
+
+      if (playAudio) {
+        setActiveToast(newNotif);
+        setTimeout(() => {
+          setActiveToast(current => current?.id === newNotif.id ? null : current);
+        }, 8000);
+
+        // Native background notification
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+          try {
+            new Notification(isHuman ? '🚨 Human Assistance Requested' : '💬 RCCG EVF WhatsApp Message', {
+              body: newMsg.message,
+              icon: '/favicon.ico',
+            });
+          } catch {}
+        }
+      }
+
+      return updated;
     });
-    setActiveToast(newNotif);
-
-    setTimeout(() => {
-      setActiveToast(current => current?.id === newNotif.id ? null : current);
-    }, 8000);
   };
 
-  const toggleAudio = () => {
-    const nextState = !audioEnabled;
-    setAudioEnabled(nextState);
-    localStorage.setItem('churchflow_chime_enabled', String(nextState));
-    if (nextState) {
-      playChimeSound();
+  const handleClearAll = () => {
+    const idsToClear = notifications.map(n => n.id);
+    addMultipleClearedMessageIds(idsToClear);
+    setNotifications([]);
+    saveStoredNotifications([]);
+    setActiveToast(null);
+  };
+
+  const handleDismissOne = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-  };
-
-  // Perform real-time search across members & messages
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
-    if (!val.trim()) {
-      setSearchResults([]);
-      setShowSearchPopover(false);
-      return;
+    addClearedMessageId(id);
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      saveStoredNotifications(updated);
+      return updated;
+    });
+    if (activeToast?.id === id) {
+      setActiveToast(null);
     }
-
-    setShowSearchPopover(true);
-    setIsSearching(true);
-
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-
-    searchDebounceRef.current = setTimeout(async () => {
-      const supabase = createClient();
-      const term = val.trim();
-      const results: SearchResultItem[] = [];
-
-      // 1. Search Members
-      const { data: members } = await supabase
-        .from('members')
-        .select('id, full_name, phone, email')
-        .or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`)
-        .limit(5);
-
-      if (members) {
-        members.forEach(m => {
-          results.push({
-            id: `member-${m.id}`,
-            type: 'member',
-            title: m.full_name || 'Member',
-            subtitle: `Phone: ${m.phone || 'N/A'} • ${m.email || ''}`,
-            url: `/members?search=${encodeURIComponent(m.full_name || m.phone || '')}`,
-          });
-        });
-      }
-
-      // 2. Search Conversations / Messages
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('id, conversation_id, message, created_at')
-        .ilike('message', `%${term}%`)
-        .limit(5);
-
-      if (messages) {
-        messages.forEach(msg => {
-          results.push({
-            id: `msg-${msg.id}`,
-            type: 'conversation',
-            title: `Chat: "${msg.message.slice(0, 40)}${msg.message.length > 40 ? '...' : ''}"`,
-            subtitle: `Message snippet`,
-            url: `/conversations/${msg.conversation_id}`,
-          });
-        });
-      }
-
-      setSearchResults(results);
-      setIsSearching(false);
-    }, 250);
-  };
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -229,25 +259,46 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
     const supabase = createClient();
 
     const fetchLatestInboundMessages = async () => {
-      const { data } = await supabase
-        .from('messages')
-        .select('id, conversation_id, sender, message, created_at')
-        .eq('sender', 'member')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      try {
+        const { data } = await supabase
+          .from('messages')
+          .select('id, conversation_id, sender, message, created_at')
+          .eq('sender', 'member')
+          .order('created_at', { ascending: false })
+          .limit(20);
 
-      if (data && data.length > 0) {
-        if (seenMessageIds.current.size === 0) {
-          data.forEach(m => seenMessageIds.current.add(m.id));
-        } else {
-          const now = Date.now();
-          data.forEach(m => {
-            const msgTime = new Date(m.created_at).getTime();
-            if (now - msgTime < 120000 && !seenMessageIds.current.has(m.id)) {
-              handleNewMemberMessage(m);
-            }
+        if (data && data.length > 0) {
+          const clearedIds = getClearedMessageIds();
+          const validMessages = data.filter(m => !clearedIds.has(m.id));
+
+          setNotifications(prev => {
+            let hasChanges = false;
+            const existingIds = new Set(prev.map(n => n.id));
+            const newItems: NotificationAlert[] = [];
+
+            validMessages.forEach(m => {
+              if (!existingIds.has(m.id)) {
+                hasChanges = true;
+                const isHuman = /pastor|human|talk|speak|help|counsel|prayer|urgent|deacon/i.test(m.message || '');
+                newItems.push({
+                  id: m.id,
+                  conversationId: m.conversation_id,
+                  senderName: 'Member',
+                  messageText: m.message,
+                  time: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  isHumanRequest: isHuman,
+                });
+              }
+            });
+
+            if (!hasChanges) return prev;
+            const merged = [...newItems, ...prev].slice(0, 30);
+            saveStoredNotifications(merged);
+            return merged;
           });
         }
+      } catch (err) {
+        console.error('Failed to fetch latest messages:', err);
       }
     };
 
@@ -255,12 +306,12 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
     const pollInterval = setInterval(fetchLatestInboundMessages, 6000);
 
     const channel = supabase
-      .channel('header_messages_notifications')
+      .channel('header_messages_notifications_v2')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload: any) => {
-          handleNewMemberMessage(payload.new);
+          handleNewMemberMessage(payload.new, true);
         }
       )
       .subscribe();
@@ -401,11 +452,8 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
                 </h4>
                 {notifications.length > 0 && (
                   <button
-                    onClick={() => {
-                      setNotifications([]);
-                      try { localStorage.removeItem('churchflow_notifications'); } catch {}
-                    }}
-                    className="text-[10px] text-white/40 hover:text-white transition-colors"
+                    onClick={handleClearAll}
+                    className="text-[10px] text-gold hover:text-gold-light hover:underline font-semibold transition-colors"
                   >
                     Clear All
                   </button>
@@ -414,27 +462,40 @@ export default function TopHeader({ onOpenSidebar }: TopHeaderProps) {
 
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {notifications.length === 0 ? (
-                  <p className="text-xs text-white/30 text-center py-6">No new notifications.</p>
+                  <p className="text-xs text-white/30 text-center py-6">No unread notifications.</p>
                 ) : (
                   notifications.map((n) => (
-                    <Link
+                    <div
                       key={n.id}
-                      href={`/conversations/${n.conversationId}`}
-                      onClick={() => setShowNotificationMenu(false)}
-                      className={`p-2.5 rounded-xl block transition-all border ${
+                      className={`p-2.5 rounded-xl block transition-all border relative group ${
                         n.isHumanRequest
                           ? 'bg-red-500/15 border-red-500/30 text-white'
                           : 'bg-white/5 border-white/8 text-white/80 hover:bg-white/10'
                       }`}
                     >
-                      <div className="flex items-center justify-between text-[11px] mb-1">
+                      <div className="flex items-center justify-between text-[11px] mb-1 pr-6">
                         <span className={`font-semibold ${n.isHumanRequest ? 'text-red-300' : 'text-gold'}`}>
                           {n.isHumanRequest ? '🚨 Human Request' : '💬 WhatsApp Message'}
                         </span>
                         <span className="text-white/35 text-[9px]">{n.time}</span>
                       </div>
-                      <p className="text-xs line-clamp-2 leading-relaxed text-white/90">{n.messageText}</p>
-                    </Link>
+                      <Link
+                        href={`/conversations/${n.conversationId}`}
+                        onClick={() => setShowNotificationMenu(false)}
+                        className="block hover:opacity-90 transition-opacity"
+                      >
+                        <p className="text-xs line-clamp-2 leading-relaxed text-white/90">{n.messageText}</p>
+                      </Link>
+
+                      {/* Individual dismiss button */}
+                      <button
+                        onClick={(e) => handleDismissOne(n.id, e)}
+                        title="Dismiss notification"
+                        className="absolute right-2 top-2 p-1 rounded-lg text-white/30 hover:text-white hover:bg-white/10 transition-colors opacity-80 group-hover:opacity-100"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
