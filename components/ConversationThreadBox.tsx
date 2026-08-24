@@ -13,9 +13,10 @@ interface MessageItem {
 
 interface ConversationThreadBoxProps {
   messages: MessageItem[];
+  conversationId?: string;
 }
 
-export default function ConversationThreadBox({ messages }: ConversationThreadBoxProps) {
+export default function ConversationThreadBox({ messages, conversationId }: ConversationThreadBoxProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -27,7 +28,37 @@ export default function ConversationThreadBox({ messages }: ConversationThreadBo
   useEffect(() => {
     // Auto-scroll to the newest message on initial mount (WhatsApp behavior)
     scrollToBottom(false);
-  }, []);
+
+    // Mark conversation as read and resolve any human requests
+    if (conversationId && typeof window !== 'undefined') {
+      try {
+        const nowISO = new Date().toISOString();
+        
+        // 1. Mark read timestamp
+        const rawRead = localStorage.getItem('churchflow_read_conv_timestamps_v1');
+        const readMap = rawRead ? JSON.parse(rawRead) : {};
+        readMap[conversationId] = nowISO;
+        localStorage.setItem('churchflow_read_conv_timestamps_v1', JSON.stringify(readMap));
+
+        // 2. Mark human request resolved
+        const rawResolved = localStorage.getItem('churchflow_resolved_human_requests_v1');
+        const resolvedMap = rawResolved ? JSON.parse(rawResolved) : {};
+        resolvedMap[conversationId] = nowISO;
+        localStorage.setItem('churchflow_resolved_human_requests_v1', JSON.stringify(resolvedMap));
+
+        // 3. Clear from header notifications
+        const rawNotifs = localStorage.getItem('churchflow_notifications_v2');
+        if (rawNotifs) {
+          const notifs = JSON.parse(rawNotifs);
+          const filtered = notifs.filter((n: any) => n.conversationId !== conversationId);
+          localStorage.setItem('churchflow_notifications_v2', JSON.stringify(filtered));
+        }
+
+        // Trigger storage event for live UI update
+        window.dispatchEvent(new Event('storage'));
+      } catch {}
+    }
+  }, [conversationId]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
