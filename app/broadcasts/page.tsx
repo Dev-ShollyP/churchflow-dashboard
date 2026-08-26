@@ -627,230 +627,235 @@ export default function BroadcastsPage() {
 
         {/* Create / Edit Campaign Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-            <div className="w-full max-w-2xl bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden my-8 animate-fade-in">
-              <div className="flex items-center justify-between p-5 border-b border-border/40">
-                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <div className="w-full max-w-2xl bg-zinc-950 border border-white/15 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in">
+              {/* Pinned Modal Header */}
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 flex-shrink-0 bg-zinc-900/80">
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   <Megaphone className="w-5 h-5 text-gold" />
                   {editingId ? 'Edit Broadcast Campaign' : 'Create Recurring Broadcast'}
                 </h2>
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/40 transition-colors"
+                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveBroadcast} className="p-6 space-y-5">
-                {/* Template Quick Loader */}
-                {!editingId && (
-                  <div className="p-3.5 rounded-xl bg-gold/5 border border-gold/20">
-                    <p className="text-xs font-semibold text-gold mb-2 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Quick Templates
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {TEMPLATE_PRESETS.map((tpl, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => {
-                            setTitle(tpl.title);
-                            setMessage(tpl.message);
-                            setDaysOfWeek(tpl.days);
-                            setSendTime(tpl.time);
-                            setSelectedPreview({
-                              title: tpl.title,
-                              message: tpl.message,
-                              image_url: uploadPreview || imageUrl
-                            });
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-card border border-border/60 text-xs font-medium text-foreground hover:border-gold/50 transition-colors"
-                        >
-                          {tpl.title}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Campaign Title */}
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">
-                    Campaign Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. A Great Light Vest Booking"
-                    value={title}
-                    onChange={e => {
-                      setTitle(e.target.value);
-                      setSelectedPreview(prev => ({ ...prev, title: e.target.value }));
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm focus:outline-none focus:border-gold/60 placeholder-white/30"
-                  />
-                </div>
-
-                {/* WhatsApp Message Body */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-foreground">
-                      WhatsApp Message Body * (Formatted text)
-                    </label>
-                    <span className="text-[11px] text-muted-foreground">Use *bold*, _italic_, bullet points</span>
-                  </div>
-                  <textarea
-                    rows={8}
-                    required
-                    placeholder="Type your WhatsApp announcement message..."
-                    value={message}
-                    onChange={e => {
-                      setMessage(e.target.value);
-                      setSelectedPreview(prev => ({ ...prev, message: e.target.value }));
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm font-mono focus:outline-none focus:border-gold/60 leading-relaxed placeholder-white/30"
-                  />
-                </div>
-
-                {/* Flyer / Product Photo Upload */}
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">
-                    Product / Flyer Image (Optional)
-                  </label>
-
-                  <div className="flex items-center gap-4">
-                    {uploadPreview ? (
-                      <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-border/60 flex-shrink-0 group">
-                        <img src={uploadPreview} alt="Flyer" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUploadFile(null);
-                            setUploadPreview(null);
-                            setImageUrl('');
-                            setSelectedPreview(prev => ({ ...prev, image_url: '' }));
-                          }}
-                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+              {/* Scrollable Form Body */}
+              <form onSubmit={handleSaveBroadcast} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
+                  {/* Template Quick Loader */}
+                  {!editingId && (
+                    <div className="p-3.5 rounded-xl bg-gold/5 border border-gold/20">
+                      <p className="text-xs font-semibold text-gold mb-2 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Quick Templates
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {TEMPLATE_PRESETS.map((tpl, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              setTitle(tpl.title);
+                              setMessage(tpl.message);
+                              setDaysOfWeek(tpl.days);
+                              setSendTime(tpl.time);
+                              setSelectedPreview({
+                                title: tpl.title,
+                                message: tpl.message,
+                                image_url: uploadPreview || imageUrl
+                              });
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-white/15 text-xs font-medium text-zinc-200 hover:border-gold/50 hover:text-gold transition-colors"
+                          >
+                            {tpl.title}
+                          </button>
+                        ))}
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-24 h-24 rounded-xl border border-dashed border-border/60 hover:border-gold/50 bg-background/50 flex flex-col items-center justify-center text-muted-foreground hover:text-gold transition-colors flex-shrink-0"
-                      >
-                        <UploadCloud className="w-6 h-6 mb-1" />
-                        <span className="text-[10px] font-medium">Upload Image</span>
-                      </button>
-                    )}
+                    </div>
+                  )}
 
+                  {/* Campaign Title */}
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                      Campaign Title *
+                    </label>
                     <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelected}
-                      accept="image/*"
-                      className="hidden"
+                      type="text"
+                      required
+                      placeholder="e.g. A Great Light Vest Booking"
+                      value={title}
+                      onChange={e => {
+                        setTitle(e.target.value);
+                        setSelectedPreview(prev => ({ ...prev, title: e.target.value }));
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm focus:outline-none focus:border-gold/60 placeholder-white/30"
                     />
+                  </div>
 
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <p className="text-xs text-foreground font-medium">Upload photo or flyer from your device</p>
-                      <p className="text-[11px] text-muted-foreground">PNG, JPG, or WEBP. Uploaded automatically to Supabase storage.</p>
-                      {imageUrl && !uploadFile && (
-                        <p className="text-[11px] text-gold truncate">Current: {imageUrl}</p>
+                  {/* WhatsApp Message Body */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-zinc-300">
+                        WhatsApp Message Body * (Formatted text)
+                      </label>
+                      <span className="text-[11px] text-zinc-400">Use *bold*, _italic_, bullet points</span>
+                    </div>
+                    <textarea
+                      rows={8}
+                      required
+                      placeholder="Type your WhatsApp announcement message..."
+                      value={message}
+                      onChange={e => {
+                        setMessage(e.target.value);
+                        setSelectedPreview(prev => ({ ...prev, message: e.target.value }));
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm font-mono focus:outline-none focus:border-gold/60 leading-relaxed placeholder-white/30"
+                    />
+                  </div>
+
+                  {/* Flyer / Product Photo Upload */}
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                      Product / Flyer Image (Optional)
+                    </label>
+
+                    <div className="flex items-center gap-4">
+                      {uploadPreview ? (
+                        <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-white/20 flex-shrink-0 group">
+                          <img src={uploadPreview} alt="Flyer" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadFile(null);
+                              setUploadPreview(null);
+                              setImageUrl('');
+                              setSelectedPreview(prev => ({ ...prev, image_url: '' }));
+                            }}
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-24 h-24 rounded-xl border border-dashed border-white/20 hover:border-gold/50 bg-zinc-900/50 flex flex-col items-center justify-center text-zinc-400 hover:text-gold transition-colors flex-shrink-0"
+                        >
+                          <UploadCloud className="w-6 h-6 mb-1" />
+                          <span className="text-[10px] font-medium">Upload Image</span>
+                        </button>
                       )}
+
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelected}
+                        accept="image/*"
+                        className="hidden"
+                      />
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-xs text-zinc-200 font-medium">Upload photo or flyer from your device</p>
+                        <p className="text-[11px] text-zinc-400">PNG, JPG, or WEBP. Uploaded automatically to Supabase storage.</p>
+                        {imageUrl && !uploadFile && (
+                          <p className="text-[11px] text-gold truncate">Current: {imageUrl}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Days of the Week Selection */}
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">
-                    Repeat Days (Weekly Schedule) *
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {WEEKDAYS.map(w => {
-                      const isSelected = daysOfWeek.includes(w.id);
-                      return (
-                        <button
-                          key={w.id}
-                          type="button"
-                          onClick={() => handleDayToggle(w.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                            isSelected
-                              ? 'bg-gold text-black shadow-md shadow-gold/20'
-                              : 'bg-background border border-border/60 text-muted-foreground hover:border-border'
-                          }`}
-                        >
-                          {w.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1.5">
-                    Selected: {daysOfWeek.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')}
-                  </p>
-                </div>
-
-                {/* Broadcast Time */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Days of the Week Selection */}
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">
-                      Broadcast Time (WAT)
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                      Repeat Days (Weekly Schedule) *
                     </label>
-                    <select
-                      value={sendTime}
-                      onChange={e => setSendTime(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl text-white bg-zinc-900 border border-white/20 text-sm focus:outline-none focus:border-gold/60"
-                    >
-                      {TIME_PRESETS.map((t, idx) => (
-                        <option key={idx} value={t.value} className="bg-zinc-900 text-white">{t.label}</option>
-                      ))}
-                    </select>
+                    <div className="flex flex-wrap gap-2">
+                      {WEEKDAYS.map(w => {
+                        const isSelected = daysOfWeek.includes(w.id);
+                        return (
+                          <button
+                            key={w.id}
+                            type="button"
+                            onClick={() => handleDayToggle(w.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                              isSelected
+                                ? 'bg-gold text-black shadow-md shadow-gold/20'
+                                : 'bg-zinc-900 border border-white/15 text-zinc-400 hover:border-white/30'
+                            }`}
+                          >
+                            {w.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1.5">
+                      Selected: {daysOfWeek.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')}
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">
-                      Target Audience
-                    </label>
-                    <select
-                      value={targetAudience}
-                      onChange={e => setTargetAudience(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl text-white bg-zinc-900 border border-white/20 text-sm focus:outline-none focus:border-gold/60"
+                  {/* Broadcast Time */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                        Broadcast Time (WAT)
+                      </label>
+                      <select
+                        value={sendTime}
+                        onChange={e => setSendTime(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-white bg-zinc-900 border border-white/20 text-sm focus:outline-none focus:border-gold/60"
+                      >
+                        {TIME_PRESETS.map((t, idx) => (
+                          <option key={idx} value={t.value} className="bg-zinc-900 text-white">{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                        Target Audience
+                      </label>
+                      <select
+                        value={targetAudience}
+                        onChange={e => setTargetAudience(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-white bg-zinc-900 border border-white/20 text-sm focus:outline-none focus:border-gold/60"
+                      >
+                        {AUDIENCE_OPTIONS.map(opt => (
+                          <option key={opt.id} value={opt.id} className="bg-zinc-900 text-white">{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Active Toggle */}
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-900/60 border border-white/10">
+                    <div>
+                      <p className="text-xs font-semibold text-white">Campaign Active Status</p>
+                      <p className="text-[11px] text-zinc-400">When active, this will automatically broadcast on chosen days.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsActive(!isActive)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                        isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/40'
+                      }`}
                     >
-                      {AUDIENCE_OPTIONS.map(opt => (
-                        <option key={opt.id} value={opt.id} className="bg-zinc-900 text-white">{opt.label}</option>
-                      ))}
-                    </select>
+                      {isActive ? 'Active' : 'Paused'}
+                    </button>
                   </div>
                 </div>
 
-                {/* Active Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-border/40">
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">Campaign Active Status</p>
-                    <p className="text-[11px] text-muted-foreground">When active, this will automatically broadcast on chosen days.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsActive(!isActive)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                      isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/40'
-                    }`}
-                  >
-                    {isActive ? 'Active' : 'Paused'}
-                  </button>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-border/40">
+                {/* Pinned Modal Footer */}
+                <div className="flex items-center justify-end gap-3 p-4 sm:p-5 border-t border-white/10 flex-shrink-0 bg-zinc-900/80">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-muted/40 hover:bg-muted text-foreground text-xs font-semibold transition-colors"
+                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-colors"
                   >
                     Cancel
                   </button>
@@ -879,28 +884,28 @@ export default function BroadcastsPage() {
 
         {/* Send Test Modal */}
         {testModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border/40">
-                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-zinc-950 border border-white/15 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+              <div className="flex items-center justify-between p-4 border-b border-white/10 bg-zinc-900/80">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <Send className="w-4 h-4 text-gold" />
                   Send Instant WhatsApp Test
                 </h2>
                 <button
                   onClick={() => setTestModalOpen(false)}
-                  className="p-1 text-muted-foreground hover:text-foreground rounded-lg"
+                  className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <form onSubmit={handleSendTest} className="p-5 space-y-4">
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-xs text-zinc-300 leading-relaxed">
                   Enter your WhatsApp phone number to test and verify how the announcement flyer and message will look on your personal device.
                 </p>
 
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
                     WhatsApp Phone Number (with Country Code or Local)
                   </label>
                   <input
@@ -928,7 +933,7 @@ export default function BroadcastsPage() {
                   <button
                     type="button"
                     onClick={() => setTestModalOpen(false)}
-                    className="px-3.5 py-2 rounded-xl bg-muted/40 text-foreground text-xs font-semibold"
+                    className="px-3.5 py-2 rounded-xl bg-white/10 text-white hover:bg-white/15 text-xs font-semibold"
                   >
                     Close
                   </button>
