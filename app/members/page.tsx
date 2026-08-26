@@ -68,23 +68,42 @@ export default function MembersPage() {
     setToast(null);
 
     try {
-      const res = await fetch('/api/members/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberId, membership_status: newCategory }),
-      });
+      let success = false;
+      let errorMsg = '';
 
-      const resData = await res.json();
+      try {
+        const res = await fetch('/api/members/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberId, membership_status: newCategory }),
+        });
 
-      if (!res.ok || resData.error) {
-        setToast({ type: 'error', text: `Failed to update category: ${resData.error || 'Server error'}` });
-      } else {
-        const config = CATEGORY_CONFIG[newCategory] || { label: newCategory };
-        setToast({ type: 'success', text: `Member category updated to "${config.label}"` });
-        setMembers(prev =>
-          prev.map(m => m.id === memberId ? { ...m, membership_status: newCategory } : m)
-        );
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.success) success = true;
+          else errorMsg = resData.error || 'Update failed';
+        }
+      } catch {
+        // Fall through to client fallback
       }
+
+      // Client-side fallback if server API is unavailable
+      if (!success) {
+        const supabase = createClient();
+        const { error } = await supabase
+          .from('members')
+          .update({ membership_status: newCategory })
+          .eq('id', memberId);
+
+        if (error) throw new Error(error.message);
+        success = true;
+      }
+
+      const config = CATEGORY_CONFIG[newCategory] || { label: newCategory };
+      setToast({ type: 'success', text: `Member category updated to "${config.label}"` });
+      setMembers(prev =>
+        prev.map(m => m.id === memberId ? { ...m, membership_status: newCategory } : m)
+      );
     } catch (err: any) {
       setToast({ type: 'error', text: err.message || 'Failed to update member category.' });
     } finally {
@@ -105,19 +124,38 @@ export default function MembersPage() {
 
     setSavingEdit(true);
     try {
-      const res = await fetch('/api/members/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberId: editingMember.id,
-          full_name: editName.trim(),
-          membership_status: editCategory
-        })
-      });
+      let success = false;
 
-      const resData = await res.json();
-      if (!res.ok || resData.error) {
-        throw new Error(resData.error || 'Failed to update member');
+      try {
+        const res = await fetch('/api/members/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberId: editingMember.id,
+            full_name: editName.trim(),
+            membership_status: editCategory
+          })
+        });
+
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.success) success = true;
+        }
+      } catch {
+        // Fall through to client fallback
+      }
+
+      if (!success) {
+        const supabase = createClient();
+        const { error } = await supabase
+          .from('members')
+          .update({
+            full_name: editName.trim(),
+            membership_status: editCategory
+          })
+          .eq('id', editingMember.id);
+
+        if (error) throw new Error(error.message);
       }
 
       setMembers(prev =>

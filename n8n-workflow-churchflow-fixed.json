@@ -1,0 +1,1896 @@
+{
+  "name": "ChurchFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "97e7d58e-929f-40f9-9782-13ad30e2e848",
+      "name": "WhatsApp Webhook GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        6016,
+        2848
+      ],
+      "webhookId": "6e485f4a-8c27-4742-a387-441dc5a7a5af"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "34d249ef-b330-4b8c-bd31-dff567c941aa",
+      "name": "WhatsApp Webhook POST",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        6016,
+        3312
+      ],
+      "webhookId": "64702688-9c05-4d9f-ab7a-d8964596d2db"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.query[\"hub.verify_token\"]}}",
+              "rightValue": "={{$vars.WHATSAPP_VERIFY_TOKEN}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c77f5789-dcc3-4139-a76f-8fa314a58359",
+      "name": "Verify Token Matches",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        2848
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{$json.query[\"hub.challenge\"]}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d0ddadd7-e909-4166-b00a-eb686f44bd19",
+      "name": "Respond With Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        6464,
+        2752
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "178c3664-4a6f-4623-8e06-5dada66ef54b",
+      "name": "Respond Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        6464,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "9fdd7c51-a525-4166-870a-1d2ed709cba1",
+      "name": "Respond OK (POST)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        6240,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const entry = $input.first().json.body.entry?.[0];\nconst change = entry?.changes?.[0]?.value;\nconst message = change?.messages?.[0];\n\nif (!message) {\n  return [{ json: { skip: true } }];\n}\n\nlet text = '';\nlet buttonId = '';\nlet mediaId = '';\nlet mediaType = message.type || 'text';\n\nif (message.type === 'text') {\n  text = message.text?.body || '';\n} else if (message.type === 'image') {\n  mediaId = message.image?.id || '';\n  text = message.image?.caption || '[User sent an image/flyer/photo. Please examine or acknowledge.]';\n} else if (message.type === 'interactive') {\n  if (message.interactive.type === 'button_reply') {\n    buttonId = message.interactive.button_reply.id;\n    text = message.interactive.button_reply.title;\n  } else if (message.interactive.type === 'list_reply') {\n    buttonId = message.interactive.list_reply.id;\n    text = message.interactive.list_reply.title;\n  }\n}\n\nreturn [{\n  json: {\n    skip: false,\n    phone_number_id: change.metadata.phone_number_id,\n    from_phone: message.from,\n    wa_message_id: message.id,\n    text: text,\n    button_id: buttonId,\n    media_id: mediaId,\n    message_type: mediaType,\n    profile_name: change.contacts?.[0]?.profile?.name || 'WhatsApp User'\n  }\n}];"
+      },
+      "id": "4286bc83-8d3f-4eed-9d7d-61446d070c92",
+      "name": "Parse Incoming Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.skip}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "defb5d92-be46-4425-acc8-1cdc28869402",
+      "name": "Is Status Update? (skip)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6464,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/processed_messages?on_conflict=wa_message_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { wa_message_id: $json.wa_message_id } }}",
+        "options": {}
+      },
+      "id": "2f4c91dc-764e-443b-9c7f-664143d96776",
+      "name": "Claim Message ID (Dedup)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6688,
+        3408
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$(\"Parse Incoming Message\").first().json.wa_message_id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "13d3c3cf-95cf-41f7-bb48-b0b3a57a23d9",
+      "name": "New Message? (not duplicate)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6912,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $('Parse Incoming Message').first().json.phone_number_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', status: 'read', message_id: $json.wa_message_id, typing_indicator: { type: 'text' } } }}",
+        "options": {}
+      },
+      "id": "9d091e36-f2f1-4c2d-99b6-3eccfb64cee6",
+      "name": "Send Typing Indicator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7136,
+        3408
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Parse Incoming Message').first().json }];"
+      },
+      "id": "c1bbd58d-81f8-4484-8e8a-cb353ed050a5",
+      "name": "Restore Parsed Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7360,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/whatsapp_sessions",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "phone_number_id",
+              "value": "=eq.{{$json.phone_number_id}}"
+            },
+            {
+              "name": "select",
+              "value": "branch_id"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "662f2fb7-8953-4a06-ae51-94c851d6ca40",
+      "name": "Lookup Branch by Phone Number ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7584,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst branch = Array.isArray(raw) ? raw[0] : raw;\nif (!branch || !branch.branch_id) {\n  throw new Error('No branch found for this WhatsApp phone_number_id. Add a row to whatsapp_sessions first.');\n}\nreturn [{ json: { branch_id: branch.branch_id } }];"
+      },
+      "id": "2ccebac3-2275-4cd2-8c60-52509ef5143e",
+      "name": "Extract branch_id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7808,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/members?on_conflict=branch_id,phone",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { branch_id: $(\"Extract branch_id\").first().json.branch_id, full_name: $(\"Parse Incoming Message\").first().json.profile_name, phone: $(\"Parse Incoming Message\").first().json.from_phone } }}",
+        "options": {}
+      },
+      "id": "1c234015-4fea-4613-a450-95c41ae61fe4",
+      "name": "Upsert Member",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8032,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/conversations",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "member_id",
+              "value": "=eq.{{$json[0]?.id || $json.id}}"
+            },
+            {
+              "name": "status",
+              "value": "eq.open"
+            },
+            {
+              "name": "select",
+              "value": "id"
+            },
+            {
+              "name": "order",
+              "value": "started_at.desc"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dc6acbea-ebf1-43ee-9067-0eed0db69bc5",
+      "name": "Find Open Conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "alwaysOutputData": true,
+      "position": [
+        8256,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json[0]?.id || $json.id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8271717a-135a-463f-bd47-28617d7ebd9b",
+      "name": "No Open Conversation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        8480,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/conversations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { branch_id: $(\"Extract branch_id\").first().json.branch_id, member_id: ($(\"Upsert Member\").first().json[0]?.id || $(\"Upsert Member\").first().json.id), channel: \"whatsapp\" } }}",
+        "options": {}
+      },
+      "id": "73f8629f-0e1a-4342-92dc-aac88ceeb0c9",
+      "name": "Create Conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8704,
+        3328
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst conv = Array.isArray(raw) ? raw[0] : raw;\nreturn [{ json: { conversation_id: conv.id } }];"
+      },
+      "id": "e59621a2-e327-4bae-9ffb-3f2f22b89746",
+      "name": "Resolve conversation_id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8928,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { conversation_id: $(\"Resolve conversation_id\").first().json.conversation_id, sender: \"member\", message: $(\"Parse Incoming Message\").first().json.text } }}",
+        "options": {}
+      },
+      "id": "d3f88839-911b-4024-b09a-675fb14d17f8",
+      "name": "Save Inbound Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9152,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/branch_settings",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "branch_id",
+              "value": "=eq.{{$(\"Extract branch_id\").first().json.branch_id}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e5035d53-0fd7-4de4-aa8e-2c4d93b36c6e",
+      "name": "Get Branch Settings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9376,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/ai_prompt_templates",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "branch_id",
+              "value": "=eq.{{$(\"Extract branch_id\").first().json.branch_id}}"
+            },
+            {
+              "name": "is_active",
+              "value": "eq.true"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7776ee7d-5212-48df-a201-bd342df68912",
+      "name": "Get Active AI Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9600,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/knowledge_articles",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "branch_id",
+              "value": "=eq.{{$(\"Extract branch_id\").first().json.branch_id}}"
+            },
+            {
+              "name": "visibility",
+              "value": "eq.public"
+            },
+            {
+              "name": "order",
+              "value": "priority.desc"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f1bb3445-4ba1-4ddb-9929-e124b0241017",
+      "name": "Get Knowledge Articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9824,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/events",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "or",
+              "value": "=(branch_id.eq.{{$(\"Extract branch_id\").first().json.branch_id}},branch_id.is.null)"
+            },
+            {
+              "name": "order",
+              "value": "event_date.asc"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e8293f77-5264-44b2-b131-01772bf2891d",
+      "name": "Fetch Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9936,
+        3408
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/special_programs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "or",
+              "value": "=(branch_id.eq.{{$(\"Extract branch_id\").first().json.branch_id}},branch_id.is.null)"
+            },
+            {
+              "name": "is_active",
+              "value": "eq.true"
+            },
+            {
+              "name": "order",
+              "value": "program_date.asc"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d378aa6d-9d65-45e0-8dc9-6a24771ec1ac",
+      "name": "Fetch Special Programs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10048,
+        3408
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const settingsItems = $(\"Get Branch Settings\").all();\nconst settings = settingsItems.length ? settingsItems[0].json : {};\nconst promptItems = $(\"Get Active AI Prompt\").all();\nconst prompt = promptItems.length ? promptItems[0].json : {};\nconst articleItems = $(\"Get Knowledge Articles\").all();\nconst articles = articleItems.map(function(i) { return i.json; }).slice(0, 5);\n\nconst parsed = $(\"Parse Incoming Message\").first().json;\nconst userText = (parsed.text || '').trim();\nconst lowerText = userText.toLowerCase();\nconst buttonId = (parsed.button_id || '').trim();\n\nconst storageBase = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';\n\n// ── KNOWN FLYER FALLBACKS ──\nconst KNOWN_FLYERS = [\n  { match: 'digging deep', url: storageBase + '/Service/Digging%20Deep.png' },\n  { match: 'faith clinic', url: storageBase + '/Service/faith%20clinic.jpg' },\n  { match: 'youth vigil', url: storageBase + '/Service/Youth%20vigil.jpg' },\n  { match: 'thanksgiving', url: storageBase + '/Service/Thanks.jpg' },\n  { match: 'prayer sunday', url: storageBase + '/Service/Second%20Servivce.jpg' }\n];\n\nfunction cleanDescription(desc) {\n  if (!desc) return '';\n  return desc\n    .replace(/\\[FLYER:\\s*[^\\\\\\]]+\\]/gi, '')\n    .replace(/\\[IMAGE:\\s*[^\\\\\\]]+\\]/gi, '')\n    .replace(/https?:\\/\\/[^\\s]+(?:supabase\\.co|storage)[^\\s]+\\.(?:png|jpe?g|webp|gif)/gi, '')\n    .replace(/Flyer:\\s*https?:\\/\\/[^\\s]+/gi, '')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\nfunction formatTime(t) {\n  if (!t) return '';\n  const parts = t.trim().split(':');\n  let h = parseInt(parts[0], 10);\n  if (isNaN(h)) return t;\n  const m = parts[1] ? parts[1].padStart(2, '0') : '00';\n  const ampm = h >= 12 ? 'PM' : 'AM';\n  h = h % 12 || 12;\n  return h + ':' + m + ' ' + ampm;\n}\n\nfunction formatTimeRange(start, end) {\n  if (!start) return '';\n  const s = formatTime(start);\n  const e = end ? formatTime(end) : '';\n  return e ? (s + ' – ' + e) : s;\n}\n\nfunction formatDatePretty(isoStr) {\n  if (!isoStr) return '';\n  try {\n    const d = new Date(isoStr.slice(0, 10) + 'T00:00:00+01:00');\n    return d.toLocaleDateString('en-US', {\n      weekday: 'long',\n      month: 'short',\n      day: 'numeric',\n      year: 'numeric'\n    });\n  } catch (e) {\n    return isoStr;\n  }\n}\n\nfunction resolveFlyer(item) {\n  if (!item) return '';\n  if (item.image_url) return item.image_url;\n  if (item.flyer_url) return item.flyer_url;\n  if (item.description) {\n    const m = item.description.match(/\\[FLYER:\\s*([^\\s\\]]+)\\]/i) || item.description.match(/(https?:\\/\\/[^\\s]+\\.(?:png|jpe?g|webp))/i);\n    if (m && m[1]) return m[1];\n  }\n  const t = (item.title || '').toLowerCase();\n  for (const f of KNOWN_FLYERS) { if (t.includes(f.match)) return f.url; }\n  return storageBase + '/Service/First%20Service.jpg';\n}\n\nfunction encourageLine() {\n  const lines = [\n    'Come expectant — God has something special for you! 🙌',\n    'Don\\'t miss it — invite a friend and come be blessed! 🙏',\n    'We\\'d love to see your face there. Come and encounter God! ✨',\n    'This is your moment — come ready to receive! 🔥'\n  ];\n  return lines[Math.floor(Math.random() * lines.length)];\n}\n\n// ── CHURCH IDENTITY & LOCATION CONSTANTS ──\nconst CHURCH_NAME = 'RCCG Everflourishing Mega Sanctuary';\nconst CHURCH_ADDRESS = '7 Powerline Street, Iyana Iyesi, Ado Odo/Ota 112226, Ogun State';\nconst CHURCH_PLACE_ID = 'ChIJSSdhjOCZOxARPkC64JXJqks';\nconst CHURCH_MAPS_URL = 'https://maps.app.goo.gl/kCfijizViY9445b86';\n\n// ── VERIFIED ANTHEMS & KEY HYMNS (100% Exact Lyrics) ──\nconst HYMNS_AND_ANTHEMS = {\n  'rccg anthem': `🎵 *RCCG ANTHEM*\\n\\n*Verse 1*\\nWe are Redeemites\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 2*\\nWe are together\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 3*\\nWe are victorious\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 4*\\nCovenant children\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 5*\\nHallelujah,\\nHallelujah\\nHallelujah Hallelujah`,\n\n  'house fellowship anthem': `🎵 *RCCG HOUSE FELLOWSHIP ANTHEM*\\n\\n*Verse 1*\\nI love this family of God,\\nSo closely knitted into one,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 2*\\nI bless this family of God,\\nSo greatly prospered by the Lord,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 3*\\nI know this family of God,\\nSo deeply rooted in the word,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 4*\\nI see this family of God,\\nSo highly lifted above all,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 5*\\nCome, join this family of God,\\nSo highly favoured by the Lord,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.`,\n\n  'sunday school anthem': `🎵 *RCCG SUNDAY SCHOOL ANTHEM*\\n📖 *Scripture*: \"Study to shew thyself approved unto God.\" — 2 Timothy 2:15\\n\\n*Verse 1*\\nO Sunday School, on the Lord's day,\\nO how I love Thee well,\\nI am happy, it makes me glad\\nTo rejoice at Thy birth.\\n\\n*Verse 2*\\nO Sunday School, on the Lord's day,\\nThy friendship suits me well,\\nBoth young and old will sing Thy song,\\nWe long for Sunday School.\\n\\n*Verse 3*\\nO Sunday School, on the Lord's day,\\nChrist was Thy first teacher,\\nThe Holy Spirit, great teacher,\\nDoes manifest in thee.\\n\\n*Verse 4*\\nO Sunday School, on the Lord's day,\\nThis pledge we give today,\\nThat to God's word we will be true,\\nThrough Sunday School with love.\\n\\n*Verse 5*\\nO Sunday School, on the Lord's day,\\nThy counsel's so divine,\\nLead me to know the holy truth,\\nTill with my Lord I reign.`\n};\n\n// ── 1. CHECK FOR DIRECT HYMN/ANTHEM MATCH ──\nif (lowerText.includes('sunday school') && (lowerText.includes('anthem') || lowerText.includes('lyrics') || lowerText.includes('song') || lowerText.includes('hymn'))) {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['sunday school anthem'] } }];\n}\nif (lowerText.includes('house fellowship') && (lowerText.includes('anthem') || lowerText.includes('song') || lowerText.includes('lyrics') || lowerText.includes('hymn') || lowerText.includes('family of god'))) {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['house fellowship anthem'] } }];\n}\nif ((lowerText.includes('redeem') || lowerText.includes('rccg')) && (lowerText.includes('anthem') || lowerText.includes('song') || lowerText.includes('lyrics') || lowerText.includes('hymn') || lowerText.includes('we are redeemites'))) {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['rccg anthem'] } }];\n}\nif (lowerText === 'rccg anthem' || lowerText === 'anthem' || lowerText === 'the rccg anthem' || lowerText === 'the anthem' || lowerText === 'redeem anthem') {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['rccg anthem'] } }];\n}\n\n// ── 1b. HYMN LOOKUP ──\nfunction searchHymnDb(hymns, query) {\n  if (!query) return null;\n  const clean = query.trim().toLowerCase();\n\n  const numMatch = clean.match(/hymn\\s*(?:no\\.?|#)?\\s*(\\d+)|^\\s*(\\d+)\\s*$/i);\n  if (numMatch) {\n    const targetNum = parseInt(numMatch[1] || numMatch[2], 10);\n    const found = hymns.find(function(h) { return h.number === targetNum; });\n    if (found) return found;\n  }\n\n  const foundByTitle = hymns.find(function(h) {\n    return h.title && (h.title.toLowerCase().indexOf(clean) !== -1 || clean.indexOf(h.title.toLowerCase()) !== -1);\n  });\n  if (foundByTitle) return foundByTitle;\n\n  const STOPWORDS = ['the','of','in','on','is','my','me','o','a','to','and','for','with','thy','thee','thou','i','am','be','we','are','all','from'];\n  function normalizeWords(s) {\n    return (s || '').toLowerCase().replace(/[^a-z0-9\\s]/g, '').split(/\\s+/).filter(function(w) { return w.length > 2 && STOPWORDS.indexOf(w) === -1; });\n  }\n  const cleanWords = normalizeWords(clean);\n  let bestFuzzy = null;\n  let bestScore = 0;\n  hymns.forEach(function(h) {\n    if (!h.title) return;\n    const titleWords = normalizeWords(h.title);\n    if (titleWords.length === 0) return;\n    const overlap = titleWords.filter(function(w) { return cleanWords.indexOf(w) !== -1; }).length;\n    const ratio = overlap / titleWords.length;\n    if (overlap >= Math.min(2, titleWords.length) && ratio >= 0.5 && ratio > bestScore) {\n      bestScore = ratio;\n      bestFuzzy = h;\n    }\n  });\n  if (bestFuzzy) return bestFuzzy;\n\n  const foundByVerses = hymns.find(function(h) {\n    return Array.isArray(h.verses) && h.verses.some(function(v) { return (v || '').toLowerCase().indexOf(clean) !== -1; });\n  });\n  if (foundByVerses) return foundByVerses;\n\n  return null;\n}\n\nfunction formatHymnDbResponse(hymn) {\n  let output = '🎵 *RCCG HYMN ' + hymn.number + ': ' + hymn.title + '*\\n';\n  if (hymn.category) output += '🏷️ *Category*: ' + hymn.category + '\\n';\n  if (hymn.scripture) output += '📖 *Scripture*: ' + hymn.scripture + '\\n';\n  output += '\\n';\n\n  let extractedRefrain = hymn.refrain || '';\n\n  if (hymn.verses && hymn.verses.length > 0) {\n    const cleanVerses = hymn.verses.map(function(v, i) {\n      if (v.indexOf('[Refrain]') !== -1) {\n        const parts = v.split('[Refrain]');\n        if (!extractedRefrain && parts[1]) extractedRefrain = parts[1].trim();\n        return '*Verse ' + (i + 1) + '*\\n' + parts[0].trim();\n      }\n      return '*Verse ' + (i + 1) + '*\\n' + v.trim();\n    });\n    output += cleanVerses.join('\\n\\n');\n    if (extractedRefrain) output += '\\n\\n🔄 *Refrain / Chorus*:\\n_' + extractedRefrain + '_';\n  } else {\n    output += '_Official Entry in The Redeemed Hymnal (4th Edition), Hymn No. ' + hymn.number + '._\\n\\n' +\n              '*(Lyrics for this title are printed in your physical RCCG Hymnal book.)*';\n  }\n  return output;\n}\n\nconst hymnItems = $(\"Fetch Hymn Match\").all();\nconst builtInHymns = hymnItems.map(function(i) { return i.json; }).filter(function(h) { return h && h.number; });\n\nconst customHymnItems = $(\"Fetch Custom Hymns\").all();\nconst customHymnsDb = customHymnItems.map(function(i) { return i.json; }).filter(function(h) { return h && h.number; });\n\nconst hymnsDb = builtInHymns.concat(customHymnsDb);\n\nconst looksLikeHymnRequest = /hymn|lyrics|showers of blessing|blessed assurance/i.test(lowerText);\n\nif (looksLikeHymnRequest && hymnsDb.length > 0) {\n  let matchedHymn = searchHymnDb(hymnsDb, lowerText);\n\n  if (!matchedHymn) {\n    const recentItems = $(\"Fetch Recent Messages\").all();\n    const recentMessages = recentItems.map(function(i) { return i.json; });\n    const priorMemberTexts = recentMessages\n      .filter(function(m) { return m && m.sender === 'member'; })\n      .map(function(m) { return (m.message || '').toLowerCase(); });\n\n    for (let i = 0; i < priorMemberTexts.length; i++) {\n      const candidate = searchHymnDb(hymnsDb, priorMemberTexts[i]);\n      if (candidate) { matchedHymn = candidate; break; }\n    }\n  }\n\n  if (matchedHymn) {\n    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: formatHymnDbResponse(matchedHymn) } }];\n  }\n}\n\n// ── 1c. LOCATION / DIRECTIONS INTERCEPT ──\nif (buttonId === 'btn_location' || /location|address|where.*church|direction|find.*church|\\bmap\\b|navigate|\\bgps\\b|iyana iyesi|moshalashi|powerline|get to church/i.test(lowerText)) {\n  const mapsNavUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(CHURCH_NAME) + '&destination_place_id=' + CHURCH_PLACE_ID;\n  const mapsPinUrl = CHURCH_MAPS_URL;\n\n  const locationReply = '📍 *' + CHURCH_NAME + '*\\n\\n' +\n    '🏢 *Address*:\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '🗺️ *Turn-by-turn Directions*:\\n' + mapsNavUrl + '\\n\\n' +\n    '📌 *Map Pin*:\\n' + mapsPinUrl + '\\n\\n' +\n    'God bless you as you come! We look forward to worshipping with you! 🙌';\n\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: locationReply } }];\n}\n\n// ── 2. FILTER RELEVANT UPCOMING EVENTS & PROGRAMS ──\nconst now = new Date();\nconst todayISO = now.toISOString().slice(0, 10);\n\nconst dbEventsItems = $(\"Fetch Events\").all();\nconst dbEvents = dbEventsItems\n  .map(function(i) { return i.json; })\n  .filter(function(e) { return e && (e.event_date >= todayISO || !e.event_date); })\n  .slice(0, 5);\n\nconst specialProgramItems = $(\"Fetch Special Programs\").all();\nconst specialPrograms = specialProgramItems\n  .map(function(i) { return i.json; })\n  .filter(function(p) { return p && (p.program_date >= todayISO || !p.program_date); })\n  .slice(0, 3);\n\n// ── FLYER / PROGRAM DETAIL REQUEST ──\nconst flyerKeywords = /flyer|poster|picture|photo|image/i;\nconst detailKeywords = /details? of the program|more info on the program|tell me about the program|about the program/i;\nif (flyerKeywords.test(lowerText) || detailKeywords.test(lowerText)) {\n  const allPrograms = dbEvents.concat(specialPrograms);\n  let matched = null;\n\n  for (const p of allPrograms) {\n    const titleWords = (p.title || '').toLowerCase().split(/\\s+/).filter(function(w) { return w.length > 3; });\n    if (titleWords.some(function(w) { return lowerText.includes(w); })) { matched = p; break; }\n  }\n\n  if (!matched && allPrograms.length > 0) {\n    matched = allPrograms[0];\n  }\n\n  if (matched) {\n    const flyer = resolveFlyer(matched);\n    const dateRaw = matched.event_date || matched.program_date || '';\n    const dateStr = formatDatePretty(dateRaw) || dateRaw;\n    const timeStr = formatTimeRange(matched.start_time, matched.end_time);\n    const cleanDesc = cleanDescription(matched.description);\n\n    let detailText = '📢 *' + (matched.title || 'Upcoming Program') + '*\\n\\n';\n    if (dateStr) detailText += '📅 *Date*: ' + dateStr + '\\n';\n    if (timeStr) detailText += '⏰ *Time*: ' + timeStr + '\\n';\n    if (matched.location) detailText += '📍 *Location*: ' + matched.location + '\\n';\n    if (cleanDesc) detailText += '\\n' + cleanDesc + '\\n';\n    detailText += '\\n' + encourageLine();\n\n    return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: detailText } }];\n  }\n}\n\n// ── \"WHAT'S ON TODAY / TOMORROW\" DETERMINISTIC INTERCEPT ──\nconst isTomorrowQuery = /tomorrow/i.test(lowerText);\nconst isTodayQuery = /what (program|service|event)s?.*(today|do you have today)|any program today|is there a program today|programs? today|service today|what.?s (on|happening) today/i.test(lowerText);\n\nif (isTodayQuery || isTomorrowQuery) {\n  const nowWAT = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));\n  if (isTomorrowQuery) {\n    nowWAT.setDate(nowWAT.getDate() + 1);\n  }\n  const targetWeekday = nowWAT.getDay(); // 0=Sun, 2=Tue, 4=Thu\n  const targetISO = nowWAT.toISOString().slice(0, 10);\n  const targetDayLabel = isTomorrowQuery ? 'tomorrow' : 'today';\n\n  const scheduledItems = [];\n\n  if (targetWeekday === 0) scheduledItems.push({ title: 'Sunday Celebration Service', start_time: '08:00', end_time: '12:00', location: 'Main Sanctuary', description: 'Join us for a glorious time of praise, worship, and the uplifting Word of God.' });\n  if (targetWeekday === 2) scheduledItems.push({ title: 'Digging Deep (Bible Study)', start_time: '18:00', end_time: '19:00', location: 'Main Sanctuary', description: 'A profound study into God\\'s Word to nourish and build your spiritual foundation.' });\n  if (targetWeekday === 4) scheduledItems.push({ title: 'Faith Clinic (Prayer & Deliverance)', start_time: '18:00', end_time: '19:00', location: 'Main Sanctuary', description: 'A dedicated hour of warfare prayers, healing, deliverance, and breakthroughs.' });\n\n  const matchedSpecial = dbEvents.concat(specialPrograms).filter(function(p) {\n    const d = p.event_date || p.program_date;\n    return d === targetISO;\n  });\n  scheduledItems.push.apply(scheduledItems, matchedSpecial);\n\n  let replyText = '';\n  let flyer = '';\n  if (scheduledItems.length === 0) {\n    replyText = 'We have no regular service or special program scheduled for ' + targetDayLabel + '.\\n\\nFeel free to type *service times* to see our full weekly schedule, or ask about upcoming programs!';\n  } else {\n    replyText = scheduledItems.map(function(p) {\n      const t = formatTimeRange(p.start_time, p.end_time);\n      let block = '🗓️ *' + (p.title || 'Church Program') + '*';\n      if (t) block += '\\n⏰ *Time*: ' + t;\n      if (p.location) block += '\\n📍 *Location*: ' + p.location;\n      const desc = cleanDescription(p.description);\n      if (desc) block += '\\n\\n' + desc;\n      return block;\n    }).join('\\n\\n───────────────────\\n\\n') + '\\n\\n' + encourageLine();\n\n    if (scheduledItems.length === 1) {\n      flyer = resolveFlyer(scheduledItems[0]);\n    }\n  }\n  return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: replyText } }];\n}\n\n// ── 3. SERVICE TIMES QUICK REPLY ──\nif (buttonId === 'btn_services' || lowerText === 'service times' || lowerText === 'service schedule' || lowerText === 'when is service' || lowerText === 'services') {\n  let scheduleText = '🏛️ *RCCG EVERFLOURISHING MEGA SANCTUARY*\\n\\n' +\n    '*Weekly Service Schedule*:\\n' +\n    '• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n' +\n    '• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n' +\n    '• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n' +\n    '📍 *Location*: Main Sanctuary\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '_We would love to have you fellowship with us!_ 🙏';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Service/First%20Service.jpg', direct_reply: scheduleText } }];\n}\n\n// ── 4. GIVING & TITHES INTENT ──\nif (buttonId === 'btn_giving' || lowerText === 'tithe' || lowerText === 'offering' || lowerText === 'account number' || lowerText === 'how to give' || lowerText === 'giving') {\n  const replyText = '💳 *CHURCH GIVING & TITHES*\\n\\n' +\n    '🏛️ *Tithe & Offering Account*\\n' +\n    '• *Bank*: Access Bank\\n' +\n    '• *Account Number*: 0695126926\\n' +\n    '• *Account Name*: RCCG Everflourishing Parish\\n\\n' +\n    '🏗️ *Building Project Account*\\n' +\n    '• *Bank*: United Bank for Africa (UBA)\\n' +\n    '• *Account Number*: 1028494770\\n' +\n    '• *Account Name*: RCCG EVERFLOURISHING PROJECT\\n\\n' +\n    '_God bless you abundantly as you give to His work!_ ✨';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Giving/Offering.png', direct_reply: replyText } }];\n}\n\n// ── 4b. FIRST TIMER / I'M NEW HERE INTENT ──\nif (buttonId === 'btn_first_timer' || lowerText === 'i am new here' || lowerText === \"i'm new here\" || lowerText === 'new here' || lowerText === 'first timer' || lowerText === 'i am a first timer' || lowerText === 'im a first timer' || lowerText === 'im new') {\n  const firstTimerReply = '🎉 *WELCOME TO RCCG EVERFLOURISHING MEGA SANCTUARY!* 🙏\\n\\n' +\n    'We are overjoyed to welcome you to our church family! At EVF Sanctuary, you are our honored guest and family.\\n\\n' +\n    '✨ *Our Weekly Services*:\\n' +\n    '• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n' +\n    '• *Tuesdays (Digging Deep Bible Study)*: 6:00 PM – 7:00 PM\\n' +\n    '• *Thursdays (Faith Clinic Prayer)*: 6:00 PM – 7:00 PM\\n\\n' +\n    '📍 *Location*: Main Sanctuary\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '👉 *Please reply with your FULL NAME* so our pastoral team can warmly register and welcome you!';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Service/First%20Service.jpg', direct_reply: firstTimerReply } }];\n}\n\n// ── 5. GREETINGS & MENU ──\nconst isGreeting = ['hi', 'hello', 'hey', 'menu', 'start'].indexOf(lowerText) !== -1;\nif (isGreeting || buttonId === 'btn_menu') {\n  return [{\n    json: {\n      is_direct: false,\n      is_interactive: true,\n      interactive_payload: {\n        messaging_product: 'whatsapp',\n        to: parsed.from_phone,\n        type: 'interactive',\n        interactive: {\n          type: 'button',\n          body: { text: 'Welcome to RCCG Everflourishing Mega Sanctuary! 🙏\\n\\nHow may we assist you today? Tap an option below, or feel free to type your question.' },\n          footer: { text: 'RCCG EVF Sanctuary' },\n          action: {\n            buttons: [\n              { type: 'reply', reply: { id: 'btn_services', title: 'Service Times' } },\n              { type: 'reply', reply: { id: 'btn_giving', title: 'Giving & Tithes' } },\n              { type: 'reply', reply: { id: 'btn_first_timer', title: 'I am New Here' } }\n            ]\n          }\n        }\n      }\n    }\n  }];\n}\n\n// ── 6. BUILD LIGHTWEIGHT AI CONTEXT ──\nconst watTime = now.toLocaleString('en-US', {\n  timeZone: 'Africa/Lagos',\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\nconst specialProgramsBlock = specialPrograms\n  .map(function(p) {\n    const t = formatTimeRange(p.start_time, p.end_time);\n    const d = cleanDescription(p.description);\n    return '- ' + (p.title || '') + ' | Date: ' + (p.program_date || '') + (t ? (' | Time: ' + t) : '') + (d ? (' | Details: ' + d) : '');\n  })\n  .join('\\n');\n\nconst eventsBlock = dbEvents\n  .map(function(e) {\n    const t = formatTimeRange(e.start_time, e.end_time);\n    const d = cleanDescription(e.description);\n    return '- ' + (e.title || '') + ' | Date: ' + (e.event_date || '') + (t ? (' | Time: ' + t) : '') + (d ? (' | Details: ' + d) : '');\n  })\n  .join('\\n');\n\nconst knowledgeBlock = articles\n  .map(function(a) { return '• ' + a.title + ': ' + (a.markdown || '').slice(0, 300); })\n  .join('\\n');\n\nconst systemPrompt = `You are EVF Bot, the official WhatsApp assistant for RCCG Everflourishing Mega Sanctuary.\n\nCURRENT TIME (WAT): ${watTime}\nCHURCH ADDRESS: ${CHURCH_ADDRESS}\n\nUPCOMING SPECIAL PROGRAMS:\n${specialProgramsBlock || 'None scheduled currently'}\n\nREGULAR WEEKLY SERVICES:\n- Sundays: 1st Service (8:00 AM), Sunday School (9:45 AM), 2nd Service (10:15 AM)\n- Tuesdays (Digging Deep Bible Study): 6:00 PM – 7:00 PM\n- Thursdays (Faith Clinic Prayer): 6:00 PM – 7:00 PM\n\nKNOWLEDGE HIGHLIGHTS:\n${knowledgeBlock}\n\nInstructions:\n1. Formatting: Use single asterisks for *bold*. Never use double asterisks (**bold**). No markdown headers (###). Never output raw URLs or [FLYER:...] tags.\n2. Keep responses warm, spiritually uplifting, concise, and helpful.\n3. If asked about prayers, church services, doctrine, or encouragement, give scriptural and practical responses.\\n4. First Timers & Name Registration: When a user introduces themselves, shares their name, or replies with their name after tapping \\\"I am New Here\\\", acknowledge them with great warmth by their name (e.g. \\\"A very warm welcome to you, Brother/Sister [Name]! 🙌\\\") and assure them that our pastors and ministry team are excited to have them.`;\n\nreturn [{\n  json: {\n    is_direct: false,\n    is_interactive: false,\n    system_prompt: systemPrompt,\n    user_message: userText\n  }\n}];"
+      },
+      "id": "1d08286e-d784-4dc7-9dea-f1eb3956b7cb",
+      "name": "Build AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10272,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.is_direct}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d381a68-bcb7-4182-94b7-651badb7bcd7",
+      "name": "Is Direct Quick Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        10496,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.is_interactive}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "812e01f7-c7f9-4579-bdc0-9c867935672b",
+      "name": "Is Interactive Buttons?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        10720,
+        3552
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: {\n    reply: item.direct_reply,\n    image_url: item.image_url || '',\n    is_location: item.is_location || false,\n    location_lat: item.location_lat || null,\n    location_lng: item.location_lng || null,\n    location_name: item.location_name || '',\n    location_address: item.location_address || ''\n  }\n}];"
+      },
+      "id": "a967e459-2430-4036-94a6-121ba6821ac8",
+      "name": "Format Direct Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11168,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = '';\ntry {\n  const data = $input.first().json;\n  if (data.choices && data.choices[0]?.message?.content) {\n    raw = data.choices[0].message.content.trim();\n  } else if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {\n    raw = data.candidates[0].content.parts[0].text.trim();\n  } else if (typeof data === 'string') {\n    raw = data;\n  }\n} catch (e) {\n  raw = '';\n}\n\n// Convert markdown headers ### Heading to *Heading*\nlet clean = raw.replace(/^#{1,6}\\s*(.+)$/gm, '*$1*');\n\n// Convert **bold** and ***bold*** to WhatsApp single *bold*\nclean = clean.replace(/\\*\\*\\*(.*?)\\*\\*\\*/g, '*$1*');\nclean = clean.replace(/\\*\\*(.*?)\\*\\*/g, '*$1*');\nclean = clean.replace(/\\*\\*([^*]+)\\*/g, '*$1*');\nclean = clean.replace(/\\*([^*]+)\\*\\*/g, '*$1*');\n\n// Remove double underscores __italic__ to _italic_\nclean = clean.replace(/__([^_]+)__/g, '_$1_');\n\n// Remove any unwanted [FLYER:...] or [IMAGE:...] tags or raw storage URLs\nclean = clean.replace(/\\[FLYER:\\s*[^\\\\\\]]+\\]/gi, '');\nclean = clean.replace(/\\[IMAGE:\\s*[^\\\\\\]]+\\]/gi, '');\nclean = clean.replace(/https?:\\/\\/[^\\s]+(?:supabase\\.co|storage)[^\\s]+\\.(?:png|jpe?g|webp|gif)/gi, '');\n\n// Clean multiple consecutive empty lines\nclean = clean.replace(/\\n{3,}/g, '\\n\\n').trim();\n\nreturn [{ json: { reply: clean, image_url: '' } }];"
+      },
+      "id": "d5ae5243-e052-4c59-a861-b20a36de87cc",
+      "name": "Extract AI Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11168,
+        3456
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { conversation_id: $('Resolve conversation_id').first().json.conversation_id, sender: 'assistant', message: ($json.reply || $json.message || 'Thank you for reaching out to RCCG Everflourishing Mega Sanctuary!') } }}",
+        "options": {}
+      },
+      "id": "48b6cc1a-04a7-43de-8ce1-69cedfeec01d",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11392,
+        3504
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{$json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.is_location ? { messaging_product: 'whatsapp', to: $json.from_phone, type: 'location', location: { latitude: $json.location_lat, longitude: $json.location_lng, name: $json.location_name, address: $json.location_address } } : (($json.image_url && $json.image_url.trim() !== '') ? { messaging_product: 'whatsapp', to: $json.from_phone, type: 'image', image: { link: $json.image_url, caption: $json.reply } } : { messaging_product: 'whatsapp', to: $json.from_phone, type: 'text', text: { body: $json.reply } }) }}",
+        "options": {}
+      },
+      "id": "e427d373-4962-430f-9498-c65466b1a098",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11616,
+        3312
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 800,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{$(\"Parse Incoming Message\").first().json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.interactive_payload }}",
+        "options": {}
+      },
+      "id": "15f4871f-9bbd-45b1-ba02-5c84e0232a5f",
+      "name": "Send WhatsApp Buttons",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10944,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{$json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: \"whatsapp\", to: $json.from_phone, type: \"text\", text: { body: $json.fallback_text } } }}",
+        "options": {}
+      },
+      "id": "deb882ab-4938-436c-b9c6-c05e79954624",
+      "name": "Send Text Fallback (image failed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12064,
+        3264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let directReply = '';\ntry { directReply = $('Format Direct Reply').first().json.reply || ''; } catch (e) {}\n\nlet aiReply = '';\ntry { aiReply = $('Extract AI Reply').first().json.reply || ''; } catch (e) {}\n\nlet phoneNumberId = '';\nlet fromPhone = '';\ntry {\n  phoneNumberId = $('Parse Incoming Message').first().json.phone_number_id || '';\n  fromPhone = $('Parse Incoming Message').first().json.from_phone || '';\n} catch (e) {}\n\nconst inputData = $json || {};\nconst textReply = inputData.reply || inputData.message || directReply || aiReply || \"Thank you for reaching out to RCCG Everflourishing Mega Sanctuary!\";\n\nreturn [{ json: { fallback_text: textReply, phone_number_id: phoneNumberId, from_phone: fromPhone } }];"
+      },
+      "id": "92dd6df7-206b-4a0d-b193-7b914901c9d6",
+      "name": "Prepare Fallback Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11840,
+        3264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let directData = {};\ntry { directData = $('Format Direct Reply').first().json || {}; } catch (e) {}\n\nlet aiData = {};\ntry { aiData = $('Extract AI Reply').first().json || {}; } catch (e) {}\n\nconst inputData = $json || {};\nconst textReply = inputData.reply || inputData.message || directData.reply || aiData.reply || '';\nconst flyerUrl = inputData.image_url || directData.image_url || '';\nconst isLocation = inputData.is_location || directData.is_location || false;\n\nlet phoneNumberId = '';\nlet fromPhone = '';\ntry {\n  phoneNumberId = $('Parse Incoming Message').first().json.phone_number_id || '';\n  fromPhone = $('Parse Incoming Message').first().json.from_phone || '';\n} catch (e) {}\n\nreturn [{ json: {\n  reply: textReply,\n  image_url: flyerUrl,\n  phone_number_id: phoneNumberId,\n  from_phone: fromPhone,\n  is_location: isLocation,\n  location_lat: inputData.location_lat || directData.location_lat || null,\n  location_lng: inputData.location_lng || directData.location_lng || null,\n  location_name: inputData.location_name || directData.location_name || '',\n  location_address: inputData.location_address || directData.location_address || ''\n} }];"
+      },
+      "id": "9c4cb81a-96a1-4034-92d3-29f928697c74",
+      "name": "Prepare Reply Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11392,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let errMsg = '';\ntry { errMsg = JSON.stringify($json.error || $json); } catch (e) { errMsg = String($json); }\n\nconst isRateLimit = /429|rate.?limit|quota/i.test(errMsg);\n\nconst reply = isRateLimit\n  ? \"We're getting a lot of messages right now 🙏 Please give us a moment and try again shortly, or a team member will respond soon.\"\n  : \"We've received your message! Someone from our team will get back to you shortly. 🙏\";\n\nreturn [{ json: { reply, image_url: '' } }];"
+      },
+      "id": "d965dee3-1bb7-4507-b27a-4eaf3d450a20",
+      "name": "AI Fallback Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11168,
+        3648
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "198b790d-7f13-491c-aa89-bc39e21cd88b",
+      "name": "Cron Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        6016,
+        2528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst storageBase = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';\n\nfunction fmtWAT(d) {\n  return d.toLocaleString('en-US', { timeZone: 'Africa/Lagos', weekday: 'long', month: 'long', day: 'numeric' });\n}\nfunction isoDateWAT(d) {\n  return d.toLocaleString('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' });\n}\nfunction atWATTime(base, hour, minute) {\n  const dateStr = isoDateWAT(base);\n  return new Date(`${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+01:00`);\n}\nfunction daysBetween(isoA, isoB) {\n  const a = new Date(isoA + 'T00:00:00+01:00');\n  const b = new Date(isoB + 'T00:00:00+01:00');\n  return Math.round((b - a) / 86400000);\n}\nfunction nextWeeklyOccurrence(targetDow, hour, minute) {\n  let d = new Date(now);\n  for (let i = 0; i < 8; i++) {\n    const candidate = atWATTime(d, hour, minute);\n    if (candidate.getDay() === targetDow && candidate.getTime() > now.getTime()) return candidate;\n    d.setDate(d.getDate() + 1);\n  }\n  return atWATTime(now, hour, minute);\n}\nfunction nextLastWeekdayOfMonthOccurrence(targetDow, hour, minute) {\n  function lastWeekdayOf(year, month) {\n    const lastDay = new Date(year, month + 1, 0);\n    const diff = (lastDay.getDay() - targetDow + 7) % 7;\n    lastDay.setDate(lastDay.getDate() - diff);\n    return lastDay;\n  }\n  const nowLagos = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));\n  let candidate = atWATTime(lastWeekdayOf(nowLagos.getFullYear(), nowLagos.getMonth()), hour, minute);\n  if (candidate.getTime() <= now.getTime()) {\n    const nextMonth = new Date(nowLagos.getFullYear(), nowLagos.getMonth() + 1, 1);\n    candidate = atWATTime(lastWeekdayOf(nextMonth.getFullYear(), nextMonth.getMonth()), hour, minute);\n  }\n  return candidate;\n}\nfunction currentOrNextSundayDate() {\n  const nowLagos = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));\n  const daysUntilSun = (7 - nowLagos.getDay()) % 7;\n  const d = new Date(nowLagos);\n  d.setDate(d.getDate() + daysUntilSun);\n  return d;\n}\nfunction sundayOccurrenceAt(hour, minute) {\n  return atWATTime(currentOrNextSundayDate(), hour, minute);\n}\n\nconst todayISO = isoDateWAT(now);\nconst due = [];\n\n// WEEKDAY SERVICES (Tue & Thu) - Same day ONLY (1hr and 30min before)\nconst weekdayServices = [\n  { name: 'Digging Deep (Bible Study)', occurrence: nextWeeklyOccurrence(2, 18, 0), flyer: storageBase + '/Service/Digging%20Deep.png', verse: '\\\"Study to shew thyself approved unto God.\\\" — 2 Tim 2:15' },\n  { name: 'Faith Clinic (Miracle Hour)', occurrence: nextWeeklyOccurrence(4, 18, 0), flyer: storageBase + '/Service/faith%20clinic.jpg', verse: '\\\"The prayer of faith shall save the sick.\\\" — James 5:15' },\n  { name: 'Youth Vigil (YAYA)', occurrence: nextLastWeekdayOfMonthOccurrence(3, 23, 0), flyer: storageBase + '/Service/Youth%20vigil.jpg', verse: '\\\"Continue in prayer, and watch in the same with thanksgiving.\\\" — Col 4:2' }\n];\n\nfor (const svc of weekdayServices) {\n  const svcDateISO = isoDateWAT(svc.occurrence);\n  const daysAway = daysBetween(todayISO, svcDateISO);\n  const timeLabel = svc.occurrence.toLocaleString('en-US', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit' });\n  const dateLabel = fmtWAT(svc.occurrence);\n  if (daysAway === 0) {\n    for (const off of [{ type: '1h', minutes: 60, label: 'IN 1 HOUR' }, { type: '30m', minutes: 30, label: 'IN 30 MINUTES' }]) {\n      const sendAt = new Date(svc.occurrence.getTime() - off.minutes * 60000);\n      if (sendAt.getTime() <= now.getTime()) continue;\n      due.push({ json: { should_send: true, service_name: svc.name, reminder_type: off.type, dedup_key: `${svc.name} :: ${off.type}`, occurrence_date: svcDateISO, flyer_url: svc.flyer, send_at: sendAt.toISOString(), tpl_service_upper: svc.name.toUpperCase(), tpl_offset_upper: off.label, tpl_service_name: svc.name, tpl_date_label: dateLabel, tpl_time_label: timeLabel, tpl_verse: svc.verse } });\n    }\n  }\n}\n\n// SUNDAY SERVICES - Saturday 7 PM + Sunday 1hr & 30min before\nconst sundayBase = currentOrNextSundayDate();\nconst sunDayOfMonth = sundayBase.getDate();\nlet sundayService = null;\nif (sunDayOfMonth <= 7) {\n  sundayService = { name: 'Thanksgiving Sunday Service', occurrence: sundayOccurrenceAt(8, 0), flyer: storageBase + '/Service/Thanks.jpg', verse: '\\\"Enter into his gates with thanksgiving.\\\" — Psalm 100:4' };\n} else if (sunDayOfMonth <= 14) {\n  sundayService = { name: 'Prayer Sunday', occurrence: sundayOccurrenceAt(8, 0), flyer: storageBase + '/Service/Second%20Servivce.jpg', verse: '\\\"Call unto me, and I will answer thee.\\\" — Jeremiah 33:3' };\n} else if (sunDayOfMonth <= 21) {\n  sundayService = { name: 'Youth Sunday', occurrence: sundayOccurrenceAt(8, 0), flyer: storageBase + '/Service/First%20Service.jpg', verse: '\\\"Let no man despise thy youth.\\\" — 1 Timothy 4:12' };\n} else {\n  sundayService = { name: 'Super Sunday / Relationship Sunday', occurrence: sundayOccurrenceAt(8, 0), flyer: storageBase + '/Service/First%20Service.jpg', verse: '\\\"Put on charity, which is the bond of perfectness.\\\" — Colossians 3:14' };\n}\n\nif (sundayService) {\n  const sunDateISO = isoDateWAT(sundayService.occurrence);\n  const sunDaysAway = daysBetween(todayISO, sunDateISO);\n  const sunTimeLabel = sundayService.occurrence.toLocaleString('en-US', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit' });\n  const sunDateLabel = fmtWAT(sundayService.occurrence);\n\n  if (sunDaysAway === 1) {\n    const sendAt = atWATTime(new Date(todayISO + 'T00:00:00+01:00'), 19, 0);\n    if (sendAt.getTime() > now.getTime()) {\n      due.push({ json: { should_send: true, service_name: sundayService.name, reminder_type: '1d', dedup_key: `${sundayService.name} :: 1d`, occurrence_date: sunDateISO, flyer_url: sundayService.flyer, send_at: sendAt.toISOString(), tpl_service_upper: sundayService.name.toUpperCase(), tpl_offset_upper: 'TOMORROW', tpl_service_name: sundayService.name, tpl_date_label: sunDateLabel, tpl_time_label: sunTimeLabel, tpl_verse: sundayService.verse } });\n    }\n  }\n  if (sunDaysAway === 0) {\n    for (const off of [{ type: '1h', minutes: 60, label: 'IN 1 HOUR' }, { type: '30m', minutes: 30, label: 'IN 30 MINUTES' }]) {\n      const sendAt = new Date(sundayService.occurrence.getTime() - off.minutes * 60000);\n      if (sendAt.getTime() <= now.getTime()) continue;\n      due.push({ json: { should_send: true, service_name: sundayService.name, reminder_type: off.type, dedup_key: `${sundayService.name} :: ${off.type}`, occurrence_date: sunDateISO, flyer_url: sundayService.flyer, send_at: sendAt.toISOString(), tpl_service_upper: sundayService.name.toUpperCase(), tpl_offset_upper: off.label, tpl_service_name: sundayService.name, tpl_date_label: sunDateLabel, tpl_time_label: sunTimeLabel, tpl_verse: sundayService.verse } });\n    }\n  }\n}\n\n// SPECIAL PROGRAMS from Supabase (5d, 3d, 1d at 8 AM + 1hr & 30min on event day)\ntry {\n  const spItems = $('Fetch Special Programs').all();\n  for (const item of spItems) {\n    const sp = item.json;\n    if (!sp || !sp.program_date) continue;\n    const programStart = sp.program_date.substring(0, 10);\n    const programEnd = sp.end_date ? sp.end_date.substring(0, 10) : programStart;\n\n    let startHour = 18, startMinute = 0;\n    const timeStr = (sp.start_time || '').split('-')[0].trim();\n    if (timeStr.includes(':')) {\n      const parts = timeStr.split(':');\n      startHour = parseInt(parts[0], 10) || 18;\n      startMinute = parseInt(parts[1], 10) || 0;\n    }\n\n    const eventOccurrence = atWATTime(new Date(programStart + 'T00:00:00+01:00'), startHour, startMinute);\n    const flyerUrl = sp.flyer_url || sp.image_url || (storageBase + '/Service/First%20Service.jpg');\n    const verse = sp.scripture ? ('\\\"' + sp.scripture + '\\\"') : '\\\"For I know the plans I have for you.\\\" — Jeremiah 29:11';\n    const timeLabel = eventOccurrence.toLocaleString('en-US', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit' });\n    const dateLabel = fmtWAT(eventOccurrence);\n    const spName = sp.title || 'Special Program';\n    const daysToStart = daysBetween(todayISO, programStart);\n\n    for (const adv of [{ days: 5, type: '5d', label: 'IN 5 DAYS' }, { days: 3, type: '3d', label: 'IN 3 DAYS' }, { days: 1, type: '1d', label: 'TOMORROW' }]) {\n      if (daysToStart === adv.days) {\n        const sendAt = atWATTime(new Date(todayISO + 'T00:00:00+01:00'), 8, 0);\n        if (sendAt.getTime() > now.getTime()) {\n          due.push({ json: { should_send: true, service_name: spName, reminder_type: adv.type, dedup_key: `${spName} :: ${adv.type}`, occurrence_date: programStart, flyer_url: flyerUrl, send_at: sendAt.toISOString(), tpl_service_upper: spName.toUpperCase(), tpl_offset_upper: adv.label, tpl_service_name: spName, tpl_date_label: dateLabel, tpl_time_label: timeLabel, tpl_verse: verse } });\n        }\n      }\n    }\n\n    if (todayISO >= programStart && todayISO <= programEnd) {\n      const todayOccurrence = atWATTime(new Date(todayISO + 'T00:00:00+01:00'), startHour, startMinute);\n      const todayTimeLabel = todayOccurrence.toLocaleString('en-US', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit' });\n      const todayDateLabel = fmtWAT(todayOccurrence);\n      for (const off of [{ type: '1h', minutes: 60, label: 'IN 1 HOUR' }, { type: '30m', minutes: 30, label: 'IN 30 MINUTES' }]) {\n        const sendAt = new Date(todayOccurrence.getTime() - off.minutes * 60000);\n        if (sendAt.getTime() <= now.getTime()) continue;\n        due.push({ json: { should_send: true, service_name: spName, reminder_type: off.type, dedup_key: `${spName} :: today :: ${off.type}`, occurrence_date: todayISO, flyer_url: flyerUrl, send_at: sendAt.toISOString(), tpl_service_upper: spName.toUpperCase(), tpl_offset_upper: off.label, tpl_service_name: spName, tpl_date_label: todayDateLabel, tpl_time_label: todayTimeLabel, tpl_verse: verse } });\n      }\n    }\n  }\n} catch (e) {}\n\ndue.sort((a, b) => new Date(a.json.send_at) - new Date(b.json.send_at));\nreturn due;"
+      },
+      "id": "6f21d795-e250-4176-9c3d-3da623faefae",
+      "name": "Determine Due Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        2528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.should_send}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ed68736-6047-4a16-9f62-0cb1e2212a50",
+      "name": "Should Send Reminder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6912,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/members?select=phone,full_name,branch_id,membership_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "56514032-3c93-4871-9a79-8cd9573d2b09",
+      "name": "Fetch All WhatsApp Members",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7584,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/whatsapp_sessions?select=phone_number_id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "56e30418-0aaa-47a9-a4d0-02a7d42a19cd",
+      "name": "Fetch Phone Number ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7808,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{$json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', to: $json.member_phone, type: 'template', template: { name: 'service_reminder', language: { code: 'en' }, components: [ { type: 'header', parameters: [ { type: 'image', image: { link: $json.flyer_url } } ] }, { type: 'body', parameters: [ { type: 'text', text: $json.tpl_service_upper }, { type: 'text', text: $json.tpl_offset_upper }, { type: 'text', text: $json.tpl_member_name }, { type: 'text', text: $json.tpl_service_name }, { type: 'text', text: $json.tpl_date_label }, { type: 'text', text: $json.tpl_time_label }, { type: 'text', text: $json.tpl_verse } ] } ] } } }}",
+        "options": {}
+      },
+      "id": "06c82d93-a981-4a32-9d0d-c352ab687bb1",
+      "name": "Send WhatsApp Broadcast to Member",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8256,
+        2528
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 800,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/reminder_log?on_conflict=service_name,sent_date",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { service_name: $json.dedup_key, sent_date: $json.occurrence_date } }}",
+        "options": {}
+      },
+      "id": "a1e03901-0ea9-40f9-affb-0351b222a10b",
+      "name": "Claim Reminder Slot (Dedup)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7136,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d0f7dac2-16c8-46c7-90e5-6125cc0250b9",
+      "name": "Slot Claimed? (not already sent)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        7360,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allMembers = $('Fetch All WhatsApp Members').all();\nconst members = allMembers.filter(function(m) {\n  const st = (m.json.membership_status || '').toLowerCase().trim();\n  return st === 'active' || st === 'member';\n});\n\nconst phoneNumberIdData = $input.first().json;\nlet phoneNumberId = Array.isArray(phoneNumberIdData)\n  ? phoneNumberIdData[0]?.phone_number_id\n  : (phoneNumberIdData?.phone_number_id || '');\n\nif (!phoneNumberId) {\n  phoneNumberId = '1252855381239526';\n}\n\nconst defaultFlyer = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers/Service/First%20Service.jpg';\n\nconst results = [];\nfor (let i = 0; i < members.length; i++) {\n  const memberData = members[i].json;\n  let memberPhone = (memberData.phone || '').replace(/[^0-9]/g, '');\n  if (memberPhone.startsWith('0') && memberPhone.length === 11) {\n    memberPhone = '234' + memberPhone.slice(1);\n  }\n  if (!memberPhone) continue;\n\n  const memberName = (memberData.full_name || '').trim().split(' ')[0].replace(/[^a-zA-Z0-9]/g, '') || 'Believer';\n\n  let due = {};\n  try {\n    due = $('Determine Due Reminders').itemMatching(i).json;\n  } catch (e) {}\n\n  const flyerUrl = (due.flyer_url && due.flyer_url.startsWith('https://')) ? due.flyer_url : defaultFlyer;\n  let verse = due.tpl_verse || '\"For I know the plans I have for you, declares the Lord.\" — Jeremiah 29:11';\n  if (verse.length > 300) verse = verse.substring(0, 297) + '...';\n\n  results.push({\n    json: {\n      member_phone: memberPhone,\n      phone_number_id: phoneNumberId,\n      flyer_url: flyerUrl,\n      tpl_service_upper: due.tpl_service_upper || 'CHURCH SERVICE',\n      tpl_offset_upper: due.tpl_offset_upper || 'UPCOMING',\n      tpl_member_name: memberName,\n      tpl_service_name: due.tpl_service_name || 'Church Service',\n      tpl_date_label: due.tpl_date_label || '',\n      tpl_time_label: due.tpl_time_label || '',\n      tpl_verse: verse,\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "917f926c-80d4-4a4a-9834-1049f552b37a",
+      "name": "Prepare Broadcast Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8032,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "aa2b8d40-1e49-425d-b57a-29e5b958fe47",
+      "name": "Loop Reminders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        6464,
+        2528
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{$json.send_at}}"
+      },
+      "id": "a6242c48-fac6-4cd0-9e1f-ba2ef17d9c3c",
+      "name": "Wait Until Reminder Time",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6688,
+        2448
+      ],
+      "webhookId": "wait-reminder-time-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"gpt-5.4-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": {{ JSON.stringify($('Build AI Context').first().json.system_prompt || $json.system_prompt) }}\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($('Build AI Context').first().json.user_message || $json.user_message) }}\n    }\n  ]\n}",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "f8d8392a-3021-483a-939e-8c3817f09312",
+      "name": "Call AI (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4704,
+        1120
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Webhook GET": {
+      "main": [
+        [
+          {
+            "node": "Verify Token Matches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Webhook POST": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (POST)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Incoming Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Token Matches": {
+      "main": [
+        [
+          {
+            "node": "Respond With Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Incoming Message": {
+      "main": [
+        [
+          {
+            "node": "Is Status Update? (skip)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Status Update? (skip)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Claim Message ID (Dedup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Message ID (Dedup)": {
+      "main": [
+        [
+          {
+            "node": "New Message? (not duplicate)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Message? (not duplicate)": {
+      "main": [
+        [
+          {
+            "node": "Send Typing Indicator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Typing Indicator": {
+      "main": [
+        [
+          {
+            "node": "Restore Parsed Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Parsed Message Data": {
+      "main": [
+        [
+          {
+            "node": "Lookup Branch by Phone Number ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Branch by Phone Number ID": {
+      "main": [
+        [
+          {
+            "node": "Extract branch_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract branch_id": {
+      "main": [
+        [
+          {
+            "node": "Upsert Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Member": {
+      "main": [
+        [
+          {
+            "node": "Find Open Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Conversation": {
+      "main": [
+        [
+          {
+            "node": "No Open Conversation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Open Conversation?": {
+      "main": [
+        [
+          {
+            "node": "Create Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve conversation_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Conversation": {
+      "main": [
+        [
+          {
+            "node": "Resolve conversation_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve conversation_id": {
+      "main": [
+        [
+          {
+            "node": "Save Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Inbound Message": {
+      "main": [
+        [
+          {
+            "node": "Get Branch Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Branch Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Active AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "Get Knowledge Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Knowledge Articles": {
+      "main": [
+        [
+          {
+            "node": "Fetch Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Events": {
+      "main": [
+        [
+          {
+            "node": "Fetch Special Programs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Special Programs": {
+      "main": [
+        [
+          {
+            "node": "Build AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Context": {
+      "main": [
+        [
+          {
+            "node": "Is Direct Quick Reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Direct Quick Reply?": {
+      "main": [
+        [
+          {
+            "node": "Format Direct Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Interactive Buttons?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Interactive Buttons?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call AI (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Direct Reply": {
+      "main": [
+        [
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Reply Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Reply": {
+      "main": [
+        [
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Reply Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reply Payload": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reply": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Prepare Fallback Text",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Fallback Text": {
+      "main": [
+        [
+          {
+            "node": "Send Text Fallback (image failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Fallback Reply": {
+      "main": [
+        [
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Reply Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Determine Due Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Due Reminders": {
+      "main": [
+        [
+          {
+            "node": "Loop Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Reminders": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Wait Until Reminder Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Until Reminder Time": {
+      "main": [
+        [
+          {
+            "node": "Should Send Reminder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Send Reminder?": {
+      "main": [
+        [
+          {
+            "node": "Claim Reminder Slot (Dedup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Reminder Slot (Dedup)": {
+      "main": [
+        [
+          {
+            "node": "Slot Claimed? (not already sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Claimed? (not already sent)": {
+      "main": [
+        [
+          {
+            "node": "Fetch All WhatsApp Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch All WhatsApp Members": {
+      "main": [
+        [
+          {
+            "node": "Fetch Phone Number ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Phone Number ID": {
+      "main": [
+        [
+          {
+            "node": "Prepare Broadcast Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Broadcast Payload": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Broadcast to Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Broadcast to Member": {
+      "main": [
+        [
+          {
+            "node": "Loop Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call AI (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Fallback Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "P1D01pWjggZvayyj",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "81fbd255-da56-49ef-8dbf-6fe8d54ca40a",
+  "meta": {
+    "instanceId": "58e646003d00676da4370a3e4fdde916b448508d09adbb5a71f49a4acdb7d140"
+  },
+  "nodeGroups": [],
+  "id": "FGDY265QaHaADJ2n",
+  "tags": []
+}

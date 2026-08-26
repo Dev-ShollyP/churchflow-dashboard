@@ -7,6 +7,7 @@ import {
   BookMarked, Plus, Upload, Trash2, ChevronDown
 } from 'lucide-react';
 import hymnsData from '@/lib/rccg-hymns.json';
+import { createClient } from '@/lib/supabase';
 
 interface Hymn {
   number: number;
@@ -16,20 +17,31 @@ interface Hymn {
   refrain?: string;
   scripture?: string;
   isCustom?: boolean;
+  db_id?: string;
 }
 
-const STORAGE_KEY = 'churchflow_custom_hymns';
+const supabase = createClient();
 
-function loadCustomHymns(): Hymn[] {
-  if (typeof window === 'undefined') return [];
+async function loadCustomHymnsFromDB(): Promise<Hymn[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function saveCustomHymns(hymns: Hymn[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(hymns));
+    const { data, error } = await supabase
+      .from('custom_hymns')
+      .select('*')
+      .order('number', { ascending: true });
+    if (error || !data) return [];
+    return data.map((row: any) => ({
+      db_id: row.id,
+      number: row.number,
+      title: row.title,
+      category: row.category || 'GENERAL HYMNS',
+      scripture: row.scripture || undefined,
+      verses: Array.isArray(row.verses) ? row.verses : (row.verses ? JSON.parse(row.verses) : []),
+      refrain: row.refrain || undefined,
+      isCustom: true,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export default function HymnsPage() {
@@ -50,7 +62,7 @@ export default function HymnsPage() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   useEffect(() => {
-    setCustomHymns(loadCustomHymns());
+    loadCustomHymnsFromDB().then(setCustomHymns);
   }, []);
 
   // Only include hymns that have lyrics
@@ -103,14 +115,17 @@ export default function HymnsPage() {
     setTimeout(() => setCopied(false), 3000);
   };
 
-  const handleDeleteCustom = (number: number) => {
+  const handleDeleteCustom = async (number: number) => {
+    const hymn = customHymns.find(h => h.number === number);
+    if (hymn?.db_id) {
+      await supabase.from('custom_hymns').delete().eq('id', hymn.db_id);
+    }
     const updated = customHymns.filter(h => h.number !== number);
     setCustomHymns(updated);
-    saveCustomHymns(updated);
     setSelectedHymn(null);
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!uploadTitle.trim() || !uploadVerses.trim()) return;
     setUploadSaving(true);
 
@@ -120,33 +135,42 @@ export default function HymnsPage() {
       .map(v => v.trim())
       .filter(Boolean);
 
-    const newHymn: Hymn = {
+    const insertRow = {
       number: maxNum + 1,
       title: uploadTitle.trim(),
       category: uploadCategory,
-      scripture: uploadScripture.trim() || undefined,
-      verses,
-      refrain: uploadRefrain.trim() || undefined,
-      isCustom: true,
+      scripture: uploadScripture.trim() || null,
+      verses: verses,
+      refrain: uploadRefrain.trim() || null,
     };
 
-    const updated = [...customHymns, newHymn];
-    setCustomHymns(updated);
-    saveCustomHymns(updated);
+    const { data, error } = await supabase.from('custom_hymns').insert([insertRow]).select().single();
 
+    if (!error && data) {
+      const newHymn: Hymn = {
+        db_id: data.id,
+        number: data.number,
+        title: data.title,
+        category: data.category || 'GENERAL HYMNS',
+        scripture: data.scripture || undefined,
+        verses: data.verses || verses,
+        refrain: data.refrain || undefined,
+        isCustom: true,
+      };
+      setCustomHymns(prev => [...prev, newHymn]);
+    }
+
+    setUploadSaving(false);
+    setUploadSuccess(true);
     setTimeout(() => {
-      setUploadSaving(false);
-      setUploadSuccess(true);
-      setTimeout(() => {
-        setUploadSuccess(false);
-        setShowUpload(false);
-        setUploadTitle('');
-        setUploadCategory('GENERAL HYMNS');
-        setUploadScripture('');
-        setUploadRefrain('');
-        setUploadVerses('');
-      }, 1500);
-    }, 600);
+      setUploadSuccess(false);
+      setShowUpload(false);
+      setUploadTitle('');
+      setUploadCategory('GENERAL HYMNS');
+      setUploadScripture('');
+      setUploadRefrain('');
+      setUploadVerses('');
+    }, 1500);
   };
 
   const HYMN_CATEGORIES = [
