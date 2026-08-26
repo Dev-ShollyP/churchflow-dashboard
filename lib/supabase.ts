@@ -10,10 +10,28 @@ export type PermissionKey =
   | 'events'
   | 'upload'
   | 'programs'
+  | 'broadcasts'
   | 'onboarding'
   | 'staff'
   | 'settings'
   | 'hymns';
+
+export interface ScheduledBroadcast {
+  id: string;
+  branch_id?: string;
+  title: string;
+  message: string;
+  image_url?: string | null;
+  days_of_week: string[];
+  send_time: string;
+  target_audience: string;
+  is_active: boolean;
+  last_sent_at?: string | null;
+  total_sent_count?: number;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface StaffMember {
   id: string;
@@ -27,10 +45,10 @@ export interface StaffMember {
 }
 
 export const defaultRolePermissions: Record<StaffRole, PermissionKey[]> = {
-  admin:        ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'onboarding', 'staff', 'settings', 'hymns'],
-  developer:    ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'onboarding', 'staff', 'settings', 'hymns'],
-  pastor:       ['overview', 'members', 'conversations', 'prayers', 'events', 'programs', 'onboarding', 'hymns'],
-  media_team:   ['events', 'upload', 'programs', 'onboarding', 'hymns'],
+  admin:        ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'broadcasts', 'onboarding', 'staff', 'settings', 'hymns'],
+  developer:    ['overview', 'members', 'conversations', 'prayers', 'events', 'upload', 'programs', 'broadcasts', 'onboarding', 'staff', 'settings', 'hymns'],
+  pastor:       ['overview', 'members', 'conversations', 'prayers', 'events', 'programs', 'broadcasts', 'onboarding', 'hymns'],
+  media_team:   ['events', 'upload', 'programs', 'broadcasts', 'onboarding', 'hymns'],
   followup_team:['overview', 'conversations', 'members', 'hymns'],
   prayer_team:  ['overview', 'prayers', 'members', 'conversations', 'hymns'],
 };
