@@ -689,7 +689,7 @@ export default function BroadcastsPage() {
                       setTitle(e.target.value);
                       setSelectedPreview(prev => ({ ...prev, title: e.target.value }));
                     }}
-                    className="w-full px-3.5 py-2 rounded-xl bg-background border border-border/60 text-foreground text-sm focus:outline-none focus:border-gold"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm focus:outline-none focus:border-gold/60 placeholder-white/30"
                   />
                 </div>
 
@@ -710,7 +710,7 @@ export default function BroadcastsPage() {
                       setMessage(e.target.value);
                       setSelectedPreview(prev => ({ ...prev, message: e.target.value }));
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border/60 text-foreground text-sm font-mono focus:outline-none focus:border-gold leading-relaxed"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm font-mono focus:outline-none focus:border-gold/60 leading-relaxed placeholder-white/30"
                   />
                 </div>
 
@@ -804,10 +804,10 @@ export default function BroadcastsPage() {
                     <select
                       value={sendTime}
                       onChange={e => setSendTime(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl bg-background border border-border/60 text-foreground text-sm focus:outline-none focus:border-gold"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-white bg-zinc-900 border border-white/20 text-sm focus:outline-none focus:border-gold/60"
                     >
                       {TIME_PRESETS.map((t, idx) => (
-                        <option key={idx} value={t.value}>{t.label}</option>
+                        <option key={idx} value={t.value} className="bg-zinc-900 text-white">{t.label}</option>
                       ))}
                     </select>
                   </div>
@@ -819,10 +819,10 @@ export default function BroadcastsPage() {
                     <select
                       value={targetAudience}
                       onChange={e => setTargetAudience(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl bg-background border border-border/60 text-foreground text-sm focus:outline-none focus:border-gold"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-white bg-zinc-900 border border-white/20 text-sm focus:outline-none focus:border-gold/60"
                     >
                       {AUDIENCE_OPTIONS.map(opt => (
-                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                        <option key={opt.id} value={opt.id} className="bg-zinc-900 text-white">{opt.label}</option>
                       ))}
                     </select>
                   </div>
@@ -909,7 +909,7 @@ export default function BroadcastsPage() {
                     placeholder="e.g. 08083708357 or 2348083708357"
                     value={testPhone}
                     onChange={e => setTestPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-background border border-border/60 text-foreground text-sm font-mono focus:outline-none focus:border-gold"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm font-mono focus:outline-none focus:border-gold/60 placeholder-white/30"
                   />
                 </div>
 
