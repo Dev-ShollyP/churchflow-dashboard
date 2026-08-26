@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Users, MessageSquare, Heart, Calendar,
-  Settings, LogOut, ChevronRight, UploadCloud, QrCode, UserCheck, Shield, X, Sparkles, BookOpen
+  Settings, LogOut, ChevronRight, UploadCloud, QrCode, UserCheck, Shield, X, Sparkles, BookOpen, Megaphone
 } from 'lucide-react';
 import { getCurrentStaff, StaffMember, PermissionKey, roleLabels, hasPermission, isAdmin } from '@/lib/supabase';
 import ThemeSwitcher from './ThemeSwitcher';
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { href: '/conversations',  label: 'Live Conversations',  icon: MessageSquare,   permissionKey: 'conversations' },
   { href: '/prayers',        label: 'Prayer Requests',     icon: Heart,           permissionKey: 'prayers' },
   { href: '/events',         label: 'Events & Programs',   icon: Calendar,        permissionKey: 'events' },
+  { href: '/broadcasts',     label: 'Broadcasts',          icon: Megaphone,       permissionKey: 'broadcasts' },
   { href: '/hymns',          label: 'Hymnal',              icon: BookOpen,        permissionKey: 'hymns' },
   { href: '/events/upload',  label: 'Upload Flyer',        icon: UploadCloud,     permissionKey: 'upload' },
   { href: '/onboarding',     label: 'Member Onboarding',   icon: QrCode,          permissionKey: 'onboarding' },
