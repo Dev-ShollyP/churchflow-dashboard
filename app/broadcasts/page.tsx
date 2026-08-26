@@ -211,27 +211,25 @@ export default function BroadcastsPage() {
     try {
       let finalImageUrl = imageUrl;
 
-      // Upload image to Supabase storage if selected
+      // Upload image to Supabase storage via server API (bypasses RLS)
       if (uploadFile) {
         setUploading(true);
-        const supabase = createClient();
-        const fileExt = uploadFile.name.split('.').pop();
-        const fileName = `broadcast_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `Broadcasts/${fileName}`;
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('folder', 'Broadcasts');
 
-        const { error: uploadErr } = await supabase.storage
-          .from('Flyers')
-          .upload(filePath, uploadFile, { upsert: true });
+        const uploadRes = await fetch('/api/broadcasts/upload', {
+          method: 'POST',
+          body: formData
+        });
 
-        if (uploadErr) {
-          throw new Error(`Image upload failed: ${uploadErr.message}`);
+        const uploadData = await uploadRes.json();
+
+        if (!uploadRes.ok || !uploadData.success) {
+          throw new Error(`Image upload failed: ${uploadData.error || 'Server error'}`);
         }
 
-        const { data: publicUrlData } = supabase.storage
-          .from('Flyers')
-          .getPublicUrl(filePath);
-
-        finalImageUrl = publicUrlData.publicUrl;
+        finalImageUrl = uploadData.url;
       }
 
       const payload = {
