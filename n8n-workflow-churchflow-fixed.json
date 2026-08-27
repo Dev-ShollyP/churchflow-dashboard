@@ -765,19 +765,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Safe helper to get node data without crashing if not run in test mode\nfunction safeAll(nodeName) {\n  try { return $(nodeName).all(); } catch (e) { return []; }\n}\nfunction safeFirst(nodeName) {\n  try { return $(nodeName).first().json; } catch (e) { return {}; }\n}\n\nconst settingsItems = safeAll(\"Get Branch Settings\");\nconst settings = settingsItems.length ? settingsItems[0].json : {};\nconst promptItems = safeAll(\"Get Active AI Prompt\");\nconst prompt = promptItems.length ? promptItems[0].json : {};\nconst articleItems = safeAll(\"Get Knowledge Articles\");\nconst articles = articleItems.map(function(i) { return i.json; }).slice(0, 5);\n\nconst parsed = safeFirst(\"Parse Incoming Message\");\nconst userText = (parsed.text || '').trim();\nconst lowerText = userText.toLowerCase();\nconst buttonId = (parsed.button_id || '').trim();\n\nconst storageBase = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';\n\n// ── KNOWN FLYER FALLBACKS ──\nconst KNOWN_FLYERS = [\n  { match: 'digging deep', url: storageBase + '/Service/Digging%20Deep.png' },\n  { match: 'faith clinic', url: storageBase + '/Service/faith%20clinic.jpg' },\n  { match: 'youth vigil', url: storageBase + '/Service/Youth%20vigil.jpg' },\n  { match: 'thanksgiving', url: storageBase + '/Service/Thanks.jpg' },\n  { match: 'prayer sunday', url: storageBase + '/Service/Second%20Servivce.jpg' }\n];\n\nfunction cleanDescription(desc) {\n  if (!desc) return '';\n  return desc\n    .replace(/\\[FLYER:\\s*[^\\]]+\\]/gi, '')\n    .replace(/\\[IMAGE:\\s*[^\\]]+\\]/gi, '')\n    .replace(/https?:\\/\\/[^\\s]+(?:supabase\\.co|storage)[^\\s]+\\.(?:png|jpe?g|webp|gif)/gi, '')\n    .replace(/Flyer:\\s*https?:\\/\\/[^\\s]+/gi, '')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\nfunction formatTime(t) {\n  if (!t) return '';\n  const parts = t.trim().split(':');\n  let h = parseInt(parts[0], 10);\n  if (isNaN(h)) return t;\n  const m = parts[1] ? parts[1].padStart(2, '0') : '00';\n  const ampm = h >= 12 ? 'PM' : 'AM';\n  h = h % 12 || 12;\n  return h + ':' + m + ' ' + ampm;\n}\n\nfunction formatTimeRange(start, end) {\n  if (!start) return '';\n  const s = formatTime(start);\n  const e = end ? formatTime(end) : '';\n  return e ? (s + ' – ' + e) : s;\n}\n\nfunction formatDatePretty(isoStr) {\n  if (!isoStr) return '';\n  try {\n    const d = new Date(isoStr.slice(0, 10) + 'T00:00:00+01:00');\n    return d.toLocaleDateString('en-US', {\n      weekday: 'long',\n      month: 'short',\n      day: 'numeric',\n      year: 'numeric'\n    });\n  } catch (e) {\n    return isoStr;\n  }\n}\n\nfunction resolveFlyer(item) {\n  if (!item) return '';\n  if (item.image_url) return item.image_url;\n  if (item.flyer_url) return item.flyer_url;\n  if (item.description) {\n    const m = item.description.match(/\\[FLYER:\\s*([^\\s\\]]+)\\]/i) || item.description.match(/(https?:\\/\\/[^\\s]+\\.(?:png|jpe?g|webp))/i);\n    if (m && m[1]) return m[1];\n  }\n  const t = (item.title || '').toLowerCase();\n  for (const f of KNOWN_FLYERS) { if (t.includes(f.match)) return f.url; }\n  return storageBase + '/Service/First%20Service.jpg';\n}\n\nfunction encourageLine() {\n  const lines = [\n    'Come expectant — God has something special for you! 🙌',\n    'Don\\'t miss it — invite a friend and come be blessed! 🙏',\n    'We\\'d love to see your face there. Come and encounter God! ✨',\n    'This is your moment — come ready to receive! 🔥'\n  ];\n  return lines[Math.floor(Math.random() * lines.length)];\n}\n\n// ── CHURCH IDENTITY & LOCATION CONSTANTS ──\nconst CHURCH_NAME = 'RCCG Everflourishing Mega Sanctuary';\nconst CHURCH_ADDRESS = '7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State';\nconst CHURCH_PLACE_ID = 'ChIJSSdhjOCZOxARPkC64JXJqks';\nconst CHURCH_MAPS_URL = 'https://maps.app.goo.gl/kCfijizViY9445b86';\n\n// ── VERIFIED ANTHEMS & KEY HYMNS (100% Exact Lyrics) ──\nconst HYMNS_AND_ANTHEMS = {\n  'rccg anthem': `🎵 *RCCG ANTHEM*\\n\\n*Verse 1*\\nWe are Redeemites\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 2*\\nWe are together\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 3*\\nWe are victorious\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 4*\\nCovenant children\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 5*\\nHallelujah,\\nHallelujah\\nHallelujah Hallelujah`,\n\n  'house fellowship anthem': `🎵 *RCCG HOUSE FELLOWSHIP ANTHEM*\\n\\n*Verse 1*\\nI love this family of God,\\nSo closely knitted into one,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 2*\\nI bless this family of God,\\nSo greatly prospered by the Lord,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 3*\\nI know this family of God,\\nSo deeply rooted in the word,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 4*\\nI see this family of God,\\nSo highly lifted above all,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 5*\\nCome, join this family of God,\\nSo highly favoured by the Lord,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.`,\n\n  'sunday school anthem': `🎵 *RCCG SUNDAY SCHOOL ANTHEM*\\n📖 *Scripture*: \\\"Study to shew thyself approved unto God.\\\" — 2 Timothy 2:15\\n\\n*Verse 1*\\nO Sunday School, on the Lord's day,\\nO how I love Thee well,\\nI am happy, it makes me glad\\nTo rejoice at Thy birth.\\n\\n*Verse 2*\\nO Sunday School, on the Lord's day,\\nThy friendship suits me well,\\nBoth young and old will sing Thy song,\\nWe long for Sunday School.\\n\\n*Verse 3*\\nO Sunday School, on the Lord's day,\\nChrist was Thy first teacher,\\nThe Holy Spirit, great teacher,\\nDoes manifest in thee.\\n\\n*Verse 4*\\nO Sunday School, on the Lord's day,\\nThis pledge we give today,\\nThat to God's word we will be true,\\nThrough Sunday School with love.\\n\\n*Verse 5*\\nO Sunday School, on the Lord's day,\\nThy counsel's so divine,\\nLead me to know the holy truth,\\nTill with my Lord I reign.`\n};\n\n// ── 0. NON-FAITH / OFF-TOPIC GUARDRAIL (BEFORE AI NODE) ──\nconst nonFaithKeywords = /\\b(python|javascript|java\\b|c\\+\\+|coding|programming|write.*code|write.*script|write.*program|for loop|while loop|html|css|php|react|sql query|algorithm|binary search|recursion|homework|solve.*equation|crypto|bitcoin|forex|stock market|secular)\\b/i;\nconst isFaithQuery = /service|church|hymn|bible|scripture|prayer|pastor|rccg|jesus|god|fellowship|sunday|digging deep|faith clinic|giving|tithe|offering|testimony/i.test(lowerText);\n\nif (nonFaithKeywords.test(lowerText) && !isFaithQuery) {\n  const guardrailReply = 'I am EVF Bot, the official church assistant for *RCCG Everflourishing Mega Sanctuary* 🙏\\n\\n' +\n    'I am dedicated exclusively to helping you with church services, upcoming programs, prayer requests, hymns, and spiritual guidance.\\n\\n' +\n    'How may I assist you with our church services or prayers today? ✨';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: guardrailReply } }];\n}\n\n// ── 1. CHECK FOR DIRECT HYMN/ANTHEM MATCH ──\nif (lowerText.includes('sunday school') && (lowerText.includes('anthem') || lowerText.includes('lyrics') || lowerText.includes('song') || lowerText.includes('hymn'))) {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['sunday school anthem'] } }];\n}\nif (lowerText.includes('house fellowship') && (lowerText.includes('anthem') || lowerText.includes('song') || lowerText.includes('lyrics') || lowerText.includes('hymn') || lowerText.includes('family of god'))) {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['house fellowship anthem'] } }];\n}\nif ((lowerText.includes('redeem') || lowerText.includes('rccg')) && (lowerText.includes('anthem') || lowerText.includes('song') || lowerText.includes('lyrics') || lowerText.includes('hymn') || lowerText.includes('we are redeemites'))) {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['rccg anthem'] } }];\n}\nif (lowerText === 'rccg anthem' || lowerText === 'anthem' || lowerText === 'the rccg anthem' || lowerText === 'the anthem' || lowerText === 'redeem anthem') {\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['rccg anthem'] } }];\n}\n\n// ── 1b. HYMN LOOKUP ──\nfunction searchHymnDb(hymns, query) {\n  if (!query) return null;\n  const clean = query.trim().toLowerCase();\n\n  const numMatch = clean.match(/hymn\\s*(?:no\\.?|#)?\\s*(\\d+)|^\\s*(\\d+)\\s*$/i);\n  if (numMatch) {\n    const targetNum = parseInt(numMatch[1] || numMatch[2], 10);\n    const found = hymns.find(function(h) { return h.number === targetNum; });\n    if (found) return found;\n  }\n\n  const foundByTitle = hymns.find(function(h) {\n    return h.title && (h.title.toLowerCase().indexOf(clean) !== -1 || clean.indexOf(h.title.toLowerCase()) !== -1);\n  });\n  if (foundByTitle) return foundByTitle;\n\n  const STOPWORDS = ['the','of','in','on','is','my','me','o','a','to','and','for','with','thy','thee','thou','i','am','be','we','are','all','from'];\n  function normalizeWords(s) {\n    return (s || '').toLowerCase().replace(/[^a-z0-9\\s]/g, '').split(/\\s+/).filter(function(w) { return w.length > 2 && STOPWORDS.indexOf(w) === -1; });\n  }\n  const cleanWords = normalizeWords(clean);\n  let bestFuzzy = null;\n  let bestScore = 0;\n  hymns.forEach(function(h) {\n    if (!h.title) return;\n    const titleWords = normalizeWords(h.title);\n    if (titleWords.length === 0) return;\n    const overlap = titleWords.filter(function(w) { return cleanWords.indexOf(w) !== -1; }).length;\n    const ratio = overlap / titleWords.length;\n    if (overlap >= Math.min(2, titleWords.length) && ratio >= 0.5 && ratio > bestScore) {\n      bestScore = ratio;\n      bestFuzzy = h;\n    }\n  });\n  if (bestFuzzy) return bestFuzzy;\n\n  const foundByVerses = hymns.find(function(h) {\n    return Array.isArray(h.verses) && h.verses.some(function(v) { return (v || '').toLowerCase().indexOf(clean) !== -1; });\n  });\n  if (foundByVerses) return foundByVerses;\n\n  return null;\n}\n\nfunction formatHymnDbResponse(hymn) {\n  let output = '🎵 *RCCG HYMN ' + hymn.number + ': ' + hymn.title + '*\\n';\n  if (hymn.category) output += '🏷️ *Category*: ' + hymn.category + '\\n';\n  if (hymn.scripture) output += '📖 *Scripture*: ' + hymn.scripture + '\\n';\n  output += '\\n';\n\n  let extractedRefrain = hymn.refrain || '';\n\n  if (hymn.verses && hymn.verses.length > 0) {\n    const cleanVerses = hymn.verses.map(function(v, i) {\n      if (v.indexOf('[Refrain]') !== -1) {\n        const parts = v.split('[Refrain]');\n        if (!extractedRefrain && parts[1]) extractedRefrain = parts[1].trim();\n        return '*Verse ' + (i + 1) + '*\\n' + parts[0].trim();\n      }\n      return '*Verse ' + (i + 1) + '*\\n' + v.trim();\n    });\n    output += cleanVerses.join('\\n\\n');\n    if (extractedRefrain) output += '\\n\\n🔄 *Refrain / Chorus*:\\n_' + extractedRefrain + '_';\n  } else {\n    output += '_Official Entry in The Redeemed Hymnal (4th Edition), Hymn No. ' + hymn.number + '._\\n\\n' +\n              '*(Lyrics for this title are printed in your physical RCCG Hymnal book.)*';\n  }\n  return output;\n}\n\nconst hymnItems = safeAll(\"Fetch Hymn Match\");\nconst builtInHymns = hymnItems.map(function(i) { return i.json; }).filter(function(h) { return h && h.number; });\n\nconst customHymnItems = safeAll(\"Fetch Custom Hymns\");\nconst customHymnsDb = customHymnItems.map(function(i) { return i.json; }).filter(function(h) { return h && h.number; });\n\nconst hymnsDb = builtInHymns.concat(customHymnsDb);\n\nconst looksLikeHymnRequest = /hymn|lyrics|showers of blessing|blessed assurance/i.test(lowerText);\n\nif (looksLikeHymnRequest && hymnsDb.length > 0) {\n  let matchedHymn = searchHymnDb(hymnsDb, lowerText);\n\n  if (!matchedHymn) {\n    const recentItems = safeAll(\"Fetch Recent Messages\");\n    const recentMessages = recentItems.map(function(i) { return i.json; });\n    const priorMemberTexts = recentMessages\n      .filter(function(m) { return m && m.sender === 'member'; })\n      .map(function(m) { return (m.message || '').toLowerCase(); });\n\n    for (let i = 0; i < priorMemberTexts.length; i++) {\n      const candidate = searchHymnDb(hymnsDb, priorMemberTexts[i]);\n      if (candidate) { matchedHymn = candidate; break; }\n    }\n  }\n\n  if (matchedHymn) {\n    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: formatHymnDbResponse(matchedHymn) } }];\n  }\n}\n\n// ── 1c. LOCATION / DIRECTIONS INTERCEPT ──\nif (buttonId === 'btn_location' || /location|address|where.*church|direction|find.*church|\\bmap\\b|navigate|\\bgps\\b|iyana iyesi|moshalashi|powerline|get to church/i.test(lowerText)) {\n  const mapsNavUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(CHURCH_NAME) + '&destination_place_id=' + CHURCH_PLACE_ID;\n  const mapsPinUrl = CHURCH_MAPS_URL;\n\n  const locationReply = '📍 *' + CHURCH_NAME + '*\\n\\n' +\n    '🏢 *Address*:\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '🗺️ *Turn-by-turn Directions*:\\n' + mapsNavUrl + '\\n\\n' +\n    '📌 *Map Pin*:\\n' + mapsPinUrl + '\\n\\n' +\n    'God bless you as you come! We look forward to worshipping with you! 🙌';\n\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: locationReply } }];\n}\n\n// ── 2. FILTER RELEVANT UPCOMING EVENTS & PROGRAMS ──\nconst now = new Date();\nconst todayISO = now.toISOString().slice(0, 10);\n\nconst dbEventsItems = safeAll(\"Fetch Events\");\nconst dbEvents = dbEventsItems\n  .map(function(i) { return i.json; })\n  .filter(function(e) { return e && (e.event_date >= todayISO || !e.event_date); })\n  .slice(0, 5);\n\nconst specialProgramItems = safeAll(\"Fetch Special Programs\");\nconst specialPrograms = specialProgramItems\n  .map(function(i) { return i.json; })\n  .filter(function(p) { return p && (p.program_date >= todayISO || !p.program_date); })\n  .slice(0, 3);\n\n// ── FLYER / PROGRAM DETAIL REQUEST ──\nconst flyerKeywords = /flyer|poster|picture|photo|image/i;\nconst detailKeywords = /details? of the program|more info on the program|tell me about the program|about the program/i;\nif (flyerKeywords.test(lowerText) || detailKeywords.test(lowerText)) {\n  const allPrograms = dbEvents.concat(specialPrograms);\n  let matched = null;\n\n  for (const p of allPrograms) {\n    const titleWords = (p.title || '').toLowerCase().split(/\\s+/).filter(function(w) { return w.length > 3; });\n    if (titleWords.some(function(w) { return lowerText.includes(w); })) { matched = p; break; }\n  }\n\n  if (!matched && allPrograms.length > 0) {\n    matched = allPrograms[0];\n  }\n\n  if (matched) {\n    const flyer = resolveFlyer(matched);\n    const dateRaw = matched.event_date || matched.program_date || '';\n    const dateStr = formatDatePretty(dateRaw) || dateRaw;\n    const timeStr = formatTimeRange(matched.start_time, matched.end_time);\n    const cleanDesc = cleanDescription(matched.description);\n\n    let detailText = '📢 *' + (matched.title || 'Upcoming Program') + '*\\n\\n';\n    if (dateStr) detailText += '📅 *Date*: ' + dateStr + '\\n';\n    if (timeStr) detailText += '⏰ *Time*: ' + timeStr + '\\n';\n    if (matched.location) detailText += '📍 *Location*: ' + matched.location + '\\n';\n    if (cleanDesc) detailText += '\\n' + cleanDesc + '\\n';\n    detailText += '\\n' + encourageLine();\n\n    return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: detailText } }];\n  }\n}\n\n// ── \"WHAT'S ON TODAY / TOMORROW\" DETERMINISTIC INTERCEPT ──\nconst isTomorrowQuery = /tomorrow/i.test(lowerText);\nconst isTodayQuery = /what (program|service|event)s?.*(today|do you have today)|any program today|is there a program today|programs? today|service today|what.?s (on|happening) today/i.test(lowerText);\n\nif (isTodayQuery || isTomorrowQuery) {\n  const nowWAT = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));\n  if (isTomorrowQuery) {\n    nowWAT.setDate(nowWAT.getDate() + 1);\n  }\n  const targetWeekday = nowWAT.getDay(); // 0=Sun, 2=Tue, 4=Thu\n  const targetISO = nowWAT.toISOString().slice(0, 10);\n  const targetDayLabel = isTomorrowQuery ? 'tomorrow' : 'today';\n\n  const scheduledItems = [];\n\n  if (targetWeekday === 0) scheduledItems.push({ title: 'Sunday Celebration Service', start_time: '08:00', end_time: '12:00', location: 'Main Sanctuary', description: 'Join us for a glorious time of praise, worship, and the uplifting Word of God.' });\n  if (targetWeekday === 2) scheduledItems.push({ title: 'Digging Deep (Bible Study)', start_time: '18:00', end_time: '19:00', location: 'Main Sanctuary', description: 'A profound study into God\\'s Word to nourish and build your spiritual foundation.' });\n  if (targetWeekday === 4) scheduledItems.push({ title: 'Faith Clinic (Prayer & Deliverance)', start_time: '18:00', end_time: '19:00', location: 'Main Sanctuary', description: 'A dedicated hour of warfare prayers, healing, deliverance, and breakthroughs.' });\n\n  const matchedSpecial = dbEvents.concat(specialPrograms).filter(function(p) {\n    const d = p.event_date || p.program_date;\n    return d === targetISO;\n  });\n  scheduledItems.push.apply(scheduledItems, matchedSpecial);\n\n  let replyText = '';\n  let flyer = '';\n  if (scheduledItems.length === 0) {\n    replyText = 'We have no regular service or special program scheduled for ' + targetDayLabel + '.\\n\\nFeel free to type *service times* to see our full weekly schedule, or ask about upcoming programs!';\n  } else {\n    replyText = scheduledItems.map(function(p) {\n      const t = formatTimeRange(p.start_time, p.end_time);\n      let block = '🗓️ *' + (p.title || 'Church Program') + '*';\n      if (t) block += '\\n⏰ *Time*: ' + t;\n      if (p.location) block += '\\n📍 *Location*: ' + p.location;\n      const desc = cleanDescription(p.description);\n      if (desc) block += '\\n\\n' + desc;\n      return block;\n    }).join('\\n\\n───────────────────\\n\\n') + '\\n\\n' + encourageLine();\n\n    if (scheduledItems.length === 1) {\n      flyer = resolveFlyer(scheduledItems[0]);\n    }\n  }\n  return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: replyText } }];\n}\n\n// ── 3. SERVICE TIMES QUICK REPLY ──\nif (buttonId === 'btn_services' || lowerText === 'service times' || lowerText === 'service schedule' || lowerText === 'when is service' || lowerText === 'services') {\n  let scheduleText = '🏛️ *RCCG EVERFLOURISHING MEGA SANCTUARY*\\n\\n' +\n    '*Weekly Service Schedule*:\\n' +\n    '• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n' +\n    '• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n' +\n    '• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n' +\n    '📍 *Location*: Main Sanctuary\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '_We would love to have you fellowship with us!_ 🙏';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Service/First%20Service.jpg', direct_reply: scheduleText } }];\n}\n\n// ── 4. GIVING & TITHES INTENT ──\nif (buttonId === 'btn_giving' || lowerText === 'tithe' || lowerText === 'offering' || lowerText === 'account number' || lowerText === 'how to give' || lowerText === 'giving') {\n  const replyText = '💳 *CHURCH GIVING & TITHES*\\n\\n' +\n    '🏛️ *Tithe & Offering Account*\\n' +\n    '• *Bank*: Access Bank\\n' +\n    '• *Account Number*: 0695126926\\n' +\n    '• *Account Name*: RCCG Everflourishing Parish\\n\\n' +\n    '🏗️ *Building Project Account*\\n' +\n    '• *Bank*: United Bank for Africa (UBA)\\n' +\n    '• *Account Number*: 1028494770\\n' +\n    '• *Account Name*: RCCG EVERFLOURISHING PROJECT\\n\\n' +\n    '_God bless you abundantly as you give to His work!_ ✨';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Giving/Offering.png', direct_reply: replyText } }];\n}\n\n// ── 4b. FIRST TIMER / I'M NEW HERE FLOW (Exact Design & Content) ──\nif (\n  buttonId === 'btn_first_timer' ||\n  lowerText === \"i'm new here\" ||\n  lowerText === 'i am new here' ||\n  lowerText === 'im new here' ||\n  lowerText === 'new here' ||\n  lowerText === 'first timer' ||\n  lowerText === 'first time' ||\n  lowerText === 'i am a first timer' ||\n  lowerText === 'im a first timer' ||\n  lowerText.includes('first time visiting') ||\n  lowerText.includes('new member')\n) {\n  const firstTimerReply = '🎉 *WELCOME TO RCCG EVERFLOURISHING MEGA SANCTUARY!* 🎉\\n\\n' +\n    'We are overjoyed to have you join us! At EVF Sanctuary, you are family, and we believe God brought you here for a glorious purpose.\\n\\n' +\n    '✨ *Our Weekly Services*:\\n' +\n    '• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n' +\n    '• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n' +\n    '• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n' +\n    '📍 *Location*: Main Sanctuary\\n' +\n    CHURCH_ADDRESS + '\\n\\n' +\n    'We would love to get to know you better! Please reply to us with:\\n' +\n    '1️⃣ *Your Full Name*\\n' +\n    '2️⃣ *Your Residential Location/Area*\\n' +\n    '3️⃣ *Any Prayer Request you would like us to pray for*\\n\\n' +\n    'God bless you richly! 🙏';\n\n  return [{\n    json: {\n      is_direct: true,\n      is_interactive: false,\n      image_url: storageBase + '/Service/First%20Service.jpg',\n      direct_reply: firstTimerReply\n    }\n  }];\n}\n\n// ── 5. GREETINGS & MENU ──\nconst isGreeting = ['hi', 'hello', 'hey', 'menu', 'start'].indexOf(lowerText) !== -1;\nif (isGreeting || buttonId === 'btn_menu') {\n  return [{\n    json: {\n      is_direct: false,\n      is_interactive: true,\n      interactive_payload: {\n        messaging_product: 'whatsapp',\n        to: parsed.from_phone,\n        type: 'interactive',\n        interactive: {\n          type: 'button',\n          body: { text: 'Welcome to RCCG Everflourishing Mega Sanctuary! 🙏\\n\\nHow may we assist you today? Tap an option below, or feel free to type your question.' },\n          footer: { text: 'RCCG EVF Sanctuary' },\n          action: {\n            buttons: [\n              { type: 'reply', reply: { id: 'btn_services', title: 'Service Times' } },\n              { type: 'reply', reply: { id: 'btn_giving', title: 'Giving & Tithes' } },\n              { type: 'reply', reply: { id: 'btn_first_timer', title: \"I'm New Here\" } }\n            ]\n          }\n        }\n      }\n    }\n  }];\n}\n\n// ── 6. BUILD STRICTLY FAITH-BASED AI CONTEXT ──\nconst watTime = now.toLocaleString('en-US', {\n  timeZone: 'Africa/Lagos',\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\nconst specialProgramsBlock = specialPrograms\n  .map(function(p) {\n    const t = formatTimeRange(p.start_time, p.end_time);\n    const d = cleanDescription(p.description);\n    return '- ' + (p.title || '') + ' | Date: ' + (p.program_date || '') + (t ? (' | Time: ' + t) : '') + (d ? (' | Details: ' + d) : '');\n  })\n  .join('\\n');\n\nconst eventsBlock = dbEvents\n  .map(function(e) {\n    const t = formatTimeRange(e.start_time, e.end_time);\n    const d = cleanDescription(e.description);\n    return '- ' + (e.title || '') + ' | Date: ' + (e.event_date || '') + (t ? (' | Time: ' + t) : '') + (d ? (' | Details: ' + d) : '');\n  })\n  .join('\\n');\n\nconst knowledgeBlock = articles\n  .map(function(a) { return '• ' + a.title + ': ' + (a.markdown || '').slice(0, 300); })\n  .join('\\n');\n\nconst systemPrompt = `You are EVF Bot, the official, strictly faith-focused WhatsApp assistant for RCCG Everflourishing Mega Sanctuary.\n\nCURRENT TIME (WAT): ${watTime}\nCHURCH ADDRESS: ${CHURCH_ADDRESS}\n\nUPCOMING SPECIAL PROGRAMS:\n${specialProgramsBlock || 'None scheduled currently'}\n\nREGULAR WEEKLY SERVICES:\n- Sundays: 1st Service (8:00 AM), Sunday School (9:45 AM), 2nd Service (10:15 AM)\n- Tuesdays (Digging Deep Bible Study): 6:00 PM – 7:00 PM\n- Thursdays (Faith Clinic Miracle & Deliverance): 6:00 PM – 7:00 PM\n\nKNOWLEDGE HIGHLIGHTS:\n${knowledgeBlock}\n\nCORE INSTRUCTIONS & STRICT BOUNDARIES:\n1. STRICTLY CHURCH & FAITH SCOPE: You ONLY answer questions regarding RCCG Everflourishing church events, service times, location/directions, giving, pastorate, Christian doctrine, Bible scriptures, prayers, hymns, and spiritual counseling.\n2. REFUSE ALL SECULAR / OFF-TOPIC QUESTIONS: If the user asks about programming, coding (Python, JavaScript, etc.), mathematics, school homework, secular politics, secular news, entertainment, cryptocurrency, or non-church topics, you MUST POLITELY REFUSE.\nExample Refusal:\n\"I am EVF Bot, the assistant for RCCG Everflourishing Mega Sanctuary 🙏 I can only help you with church services, upcoming programs, prayer requests, hymns, and spiritual guidance. How can I assist you with our church today?\"\n3. NEVER WRITE CODE OR DISCUSS COMPUTER PROGRAMMING: Under NO circumstances should you output code, loops, programming scripts, or technical tutorials.\n4. FIRST TIMERS: When a visitor introduces themselves, shares their full name, or residential location, warmly welcome them as family and let them know the pastoral team is praying for them.\n5. FORMATTING: Use single asterisks for *bold*. Never use double asterisks (**bold**). No markdown headers (###). Never output raw URLs or [FLYER:...] tags. Keep answers warm, encouraging, concise, and scriptural.`;\n\nreturn [{\n  json: {\n    is_direct: false,\n    is_interactive: false,\n    system_prompt: systemPrompt,\n    user_message: userText\n  }\n}];"
-      },
-      "id": "1d08286e-d784-4dc7-9dea-f1eb3956b7cb",
-      "name": "Build AI Context",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        10272,
-        3408
-      ]
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -1301,6 +1288,167 @@
     },
     {
       "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "conversation_id",
+              "value": "=eq.{{$(\"Resolve conversation_id\").first().json.conversation_id}}"
+            },
+            {
+              "name": "order",
+              "value": "created_at.desc"
+            },
+            {
+              "name": "limit",
+              "value": "8"
+            },
+            {
+              "name": "select",
+              "value": "sender,message,created_at"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f4a1892c-e123-4485-9940-fetchrecentmsg",
+      "name": "Fetch Recent Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9488,
+        2400
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $(\"Parse Incoming Message\").first().json.media_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d19284fa-b231-4198-9940-hasincomingimg",
+      "name": "Has Incoming Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        9712,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v20.0/{{ $(\"Parse Incoming Message\").first().json.media_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c91a02b-1192-4821-9940-getmediaurl",
+      "name": "Get WhatsApp Media URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9936,
+        2200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "6a82b93c-4412-4912-9940-downloadmedia",
+      "name": "Download WhatsApp Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10160,
+        2200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "let imageBase64 = '';\ntry {\n  const binaryData = $input.first().binary?.data;\n  if (binaryData && binaryData.data) {\n    const mime = binaryData.mimeType || 'image/jpeg';\n    imageBase64 = 'data:' + mime + ';base64,' + binaryData.data;\n  }\n} catch (e) {}\n\nreturn [{ json: { image_base64_url: imageBase64 } }];"
+      },
+      "id": "3b91a74d-9912-4721-9940-encodeimageb64",
+      "name": "Encode Image Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10384,
+        2200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safe helpers\nfunction safeAll(nodeName) {\n  try { return $(nodeName).all(); } catch (e) { return []; }\n}\nfunction safeFirst(nodeName) {\n  try { return $(nodeName).first().json; } catch (e) { return {}; }\n}\n\nconst settingsItems = safeAll(\"Get Branch Settings\");\nconst settings = settingsItems.length ? settingsItems[0].json : {};\nconst promptItems = safeAll(\"Get Active AI Prompt\");\nconst prompt = promptItems.length ? promptItems[0].json : {};\nconst articleItems = safeAll(\"Get Knowledge Articles\");\nconst articles = articleItems.map(function(i) { return i.json; }).slice(0, 5);\n\nconst parsed = safeFirst(\"Parse Incoming Message\");\nconst userText = (parsed.text || '').trim();\nconst lowerText = userText.toLowerCase();\nconst buttonId = (parsed.button_id || '').trim();\nconst hasMedia = Boolean(parsed.media_id);\n\n// Check if an encoded image exists\nlet incomingImageBase64 = '';\nconst encodeItems = safeAll(\"Encode Image Base64\");\nif (encodeItems.length && encodeItems[0].json && encodeItems[0].json.image_base64_url) {\n  incomingImageBase64 = encodeItems[0].json.image_base64_url;\n}\n\nconst storageBase = 'https://xzyrftzhaolovlbnpbpk.supabase.co/storage/v1/object/public/Flyers';\n\n// ── KNOWN FLYER FALLBACKS ──\nconst KNOWN_FLYERS = [\n  { match: 'digging deep', url: storageBase + '/Service/Digging%20Deep.png' },\n  { match: 'faith clinic', url: storageBase + '/Service/faith%20clinic.jpg' },\n  { match: 'youth vigil', url: storageBase + '/Service/Youth%20vigil.jpg' },\n  { match: 'thanksgiving', url: storageBase + '/Service/Thanks.jpg' },\n  { match: 'prayer sunday', url: storageBase + '/Service/Second%20Servivce.jpg' }\n];\n\nfunction cleanDescription(desc) {\n  if (!desc) return '';\n  return desc\n    .replace(/\\[FLYER:\\s*[^\\]]+\\]/gi, '')\n    .replace(/\\[IMAGE:\\s*[^\\]]+\\]/gi, '')\n    .replace(/https?:\\/\\/[^\\s]+(?:supabase\\.co|storage)[^\\s]+\\.(?:png|jpe?g|webp|gif)/gi, '')\n    .replace(/Flyer:\\s*https?:\\/\\/[^\\s]+/gi, '')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\nfunction formatTime(t) {\n  if (!t) return '';\n  const parts = t.trim().split(':');\n  let h = parseInt(parts[0], 10);\n  if (isNaN(h)) return t;\n  const m = parts[1] ? parts[1].padStart(2, '0') : '00';\n  const ampm = h >= 12 ? 'PM' : 'AM';\n  h = h % 12 || 12;\n  return h + ':' + m + ' ' + ampm;\n}\n\nfunction formatTimeRange(start, end) {\n  if (!start) return '';\n  const s = formatTime(start);\n  const e = end ? formatTime(end) : '';\n  return e ? (s + ' – ' + e) : s;\n}\n\nfunction formatDatePretty(isoStr) {\n  if (!isoStr) return '';\n  try {\n    const d = new Date(isoStr.slice(0, 10) + 'T00:00:00+01:00');\n    return d.toLocaleDateString('en-US', {\n      weekday: 'long',\n      month: 'short',\n      day: 'numeric',\n      year: 'numeric'\n    });\n  } catch (e) {\n    return isoStr;\n  }\n}\n\nfunction resolveFlyer(item) {\n  if (!item) return '';\n  if (item.image_url) return item.image_url;\n  if (item.flyer_url) return item.flyer_url;\n  if (item.description) {\n    const m = item.description.match(/\\[FLYER:\\s*([^\\s\\]]+)\\]/i) || item.description.match(/(https?:\\/\\/[^\\s]+\\.(?:png|jpe?g|webp))/i);\n    if (m && m[1]) return m[1];\n  }\n  const t = (item.title || '').toLowerCase();\n  for (const f of KNOWN_FLYERS) { if (t.includes(f.match)) return f.url; }\n  return storageBase + '/Service/First%20Service.jpg';\n}\n\nfunction encourageLine() {\n  const lines = [\n    'Come expectant — God has something special for you! 🙌',\n    'Don\\'t miss it — invite a friend and come be blessed! 🙏',\n    'We\\'d love to see your face there. Come and encounter God! ✨',\n    'This is your moment — come ready to receive! 🔥'\n  ];\n  return lines[Math.floor(Math.random() * lines.length)];\n}\n\nconst CHURCH_NAME = 'RCCG Everflourishing Mega Sanctuary';\nconst CHURCH_ADDRESS = '7, Powerline Street, Moshalashi B/Stop, Iyana Iyesi, Ota, Ogun State';\nconst CHURCH_PLACE_ID = 'ChIJSSdhjOCZOxARPkC64JXJqks';\nconst CHURCH_MAPS_URL = 'https://maps.app.goo.gl/kCfijizViY9445b86';\n\n// ── 0. NON-FAITH / OFF-TOPIC GUARDRAIL (BEFORE AI NODE) ──\nconst nonFaithKeywords = /\\b(python|javascript|java\\b|c\\+\\+|coding|programming|write.*code|write.*script|write.*program|for loop|while loop|html|css|php|react|sql query|algorithm|binary search|recursion|homework|solve.*equation|crypto|bitcoin|forex|stock market|secular)\\b/i;\nconst isFaithQuery = /service|church|hymn|bible|scripture|prayer|pastor|rccg|jesus|god|fellowship|sunday|digging deep|faith clinic|giving|tithe|offering|testimony|quiz/i.test(lowerText);\n\nif (nonFaithKeywords.test(lowerText) && !isFaithQuery && !hasMedia) {\n  const guardrailReply = 'I am EVF Bot, the official church assistant for *RCCG Everflourishing Mega Sanctuary* 🙏\\n\\n' +\n    'I am dedicated exclusively to helping you with church services, upcoming programs, prayer requests, hymns, and spiritual guidance.\\n\\n' +\n    'How may I assist you with our church services or prayers today? ✨';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: guardrailReply } }];\n}\n\n// ── 1. CHECK FOR DIRECT HYMN/ANTHEM MATCH ──\nconst HYMNS_AND_ANTHEMS = {\n  'rccg anthem': `🎵 *RCCG ANTHEM*\\n\\n*Verse 1*\\nWe are Redeemites\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 2*\\nWe are together\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 3*\\nWe are victorious\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 4*\\nCovenant children\\nUnited in love\\nJesus is for us\\nWe shall conquer\\n\\n*Verse 5*\\nHallelujah,\\nHallelujah\\nHallelujah Hallelujah`,\n  'house fellowship anthem': `🎵 *RCCG HOUSE FELLOWSHIP ANTHEM*\\n\\n*Verse 1*\\nI love this family of God,\\nSo closely knitted into one,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 2*\\nI bless this family of God,\\nSo greatly prospered by the Lord,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 3*\\nI know this family of God,\\nSo deeply rooted in the word,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 4*\\nI see this family of God,\\nSo highly lifted above all,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.\\n\\n*Verse 5*\\nCome, join this family of God,\\nSo highly favoured by the Lord,\\nThey have taken me into their arms\\nAnd am so glad to be\\nA part of this great family.`,\n  'sunday school anthem': `🎵 *RCCG SUNDAY SCHOOL ANTHEM*\\n📖 *Scripture*: \\\"Study to shew thyself approved unto God.\\\" — 2 Timothy 2:15\\n\\n*Verse 1*\\nO Sunday School, on the Lord's day,\\nO how I love Thee well,\\nI am happy, it makes me glad\\nTo rejoice at Thy birth.\\n\\n*Verse 2*\\nO Sunday School, on the Lord's day,\\nThy friendship suits me well,\\nBoth young and old will sing Thy song,\\nWe long for Sunday School.\\n\\n*Verse 3*\\nO Sunday School, on the Lord's day,\\nChrist was Thy first teacher,\\nThe Holy Spirit, great teacher,\\nDoes manifest in thee.\\n\\n*Verse 4*\\nO Sunday School, on the Lord's day,\\nThis pledge we give today,\\nThat to God's word we will be true,\\nThrough Sunday School with love.\\n\\n*Verse 5*\\nO Sunday School, on the Lord's day,\\nThy counsel's so divine,\\nLead me to know the holy truth,\\nTill with my Lord I reign.`\n};\n\nif (!hasMedia) {\n  if (lowerText.includes('sunday school') && (lowerText.includes('anthem') || lowerText.includes('lyrics') || lowerText.includes('song') || lowerText.includes('hymn'))) {\n    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['sunday school anthem'] } }];\n  }\n  if (lowerText.includes('house fellowship') && (lowerText.includes('anthem') || lowerText.includes('song') || lowerText.includes('lyrics') || lowerText.includes('hymn') || lowerText.includes('family of god'))) {\n    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['house fellowship anthem'] } }];\n  }\n  if ((lowerText.includes('redeem') || lowerText.includes('rccg')) && (lowerText.includes('anthem') || lowerText.includes('song') || lowerText.includes('lyrics') || lowerText.includes('hymn') || lowerText.includes('we are redeemites'))) {\n    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['rccg anthem'] } }];\n  }\n  if (lowerText === 'rccg anthem' || lowerText === 'anthem' || lowerText === 'the rccg anthem' || lowerText === 'the anthem' || lowerText === 'redeem anthem') {\n    return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: HYMNS_AND_ANTHEMS['rccg anthem'] } }];\n  }\n}\n\n// ── 1c. LOCATION / DIRECTIONS INTERCEPT ──\nif (buttonId === 'btn_location' || (!hasMedia && /^(location|address|where is church|direction|find church|map|gps)$/i.test(lowerText))) {\n  const mapsNavUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(CHURCH_NAME) + '&destination_place_id=' + CHURCH_PLACE_ID;\n  const mapsPinUrl = CHURCH_MAPS_URL;\n\n  const locationReply = '📍 *' + CHURCH_NAME + '*\\n\\n' +\n    '🏢 *Address*:\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '🗺️ *Turn-by-turn Directions*:\\n' + mapsNavUrl + '\\n\\n' +\n    '📌 *Map Pin*:\\n' + mapsPinUrl + '\\n\\n' +\n    'God bless you as you come! We look forward to worshipping with you! 🙌';\n\n  return [{ json: { is_direct: true, is_interactive: false, image_url: '', direct_reply: locationReply } }];\n}\n\n// ── 2. FILTER RELEVANT UPCOMING EVENTS & PROGRAMS ──\nconst now = new Date();\nconst todayISO = now.toISOString().slice(0, 10);\n\nconst dbEventsItems = safeAll(\"Fetch Events\");\nconst dbEvents = dbEventsItems\n  .map(function(i) { return i.json; })\n  .filter(function(e) { return e && (e.event_date >= todayISO || !e.event_date); })\n  .slice(0, 5);\n\nconst specialProgramItems = safeAll(\"Fetch Special Programs\");\nconst specialPrograms = specialProgramItems\n  .map(function(i) { return i.json; })\n  .filter(function(p) { return p && (p.program_date >= todayISO || !p.program_date); })\n  .slice(0, 3);\n\n// ── FLYER / PROGRAM DETAIL REQUEST (Only if user did NOT upload an image) ──\nif (!hasMedia && !incomingImageBase64) {\n  const flyerKeywords = /flyer|poster|picture|photo/i;\n  const detailKeywords = /details? of the program|more info on the program|tell me about the program|about the program/i;\n  if (flyerKeywords.test(lowerText) || detailKeywords.test(lowerText)) {\n    const allPrograms = dbEvents.concat(specialPrograms);\n    let matched = null;\n\n    for (const p of allPrograms) {\n      const titleWords = (p.title || '').toLowerCase().split(/\\s+/).filter(function(w) { return w.length > 3; });\n      if (titleWords.some(function(w) { return lowerText.includes(w); })) { matched = p; break; }\n    }\n\n    if (matched) {\n      const flyer = resolveFlyer(matched);\n      const dateRaw = matched.event_date || matched.program_date || '';\n      const dateStr = formatDatePretty(dateRaw) || dateRaw;\n      const timeStr = formatTimeRange(matched.start_time, matched.end_time);\n      const cleanDesc = cleanDescription(matched.description);\n\n      let detailText = '📢 *' + (matched.title || 'Upcoming Program') + '*\\n\\n';\n      if (dateStr) detailText += '📅 *Date*: ' + dateStr + '\\n';\n      if (timeStr) detailText += '⏰ *Time*: ' + timeStr + '\\n';\n      if (matched.location) detailText += '📍 *Location*: ' + matched.location + '\\n';\n      if (cleanDesc) detailText += '\\n' + cleanDesc + '\\n';\n      detailText += '\\n' + encourageLine();\n\n      return [{ json: { is_direct: true, is_interactive: false, image_url: flyer, direct_reply: detailText } }];\n    }\n  }\n}\n\n// ── 3. SERVICE TIMES QUICK REPLY ──\nif (buttonId === 'btn_services' || (!hasMedia && (lowerText === 'service times' || lowerText === 'service schedule' || lowerText === 'when is service' || lowerText === 'services'))) {\n  let scheduleText = '🏛️ *RCCG EVERFLOURISHING MEGA SANCTUARY*\\n\\n' +\n    '*Weekly Service Schedule*:\\n' +\n    '• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n' +\n    '• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n' +\n    '• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n' +\n    '📍 *Location*: Main Sanctuary\\n' + CHURCH_ADDRESS + '\\n\\n' +\n    '_We would love to have you fellowship with us!_ 🙏';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Service/First%20Service.jpg', direct_reply: scheduleText } }];\n}\n\n// ── 4. GIVING & TITHES INTENT ──\nif (buttonId === 'btn_giving' || (!hasMedia && (lowerText === 'tithe' || lowerText === 'offering' || lowerText === 'account number' || lowerText === 'how to give' || lowerText === 'giving'))) {\n  const replyText = '💳 *CHURCH GIVING & TITHES*\\n\\n' +\n    '🏛️ *Tithe & Offering Account*\\n' +\n    '• *Bank*: Access Bank\\n' +\n    '• *Account Number*: 0695126926\\n' +\n    '• *Account Name*: RCCG Everflourishing Parish\\n\\n' +\n    '🏗️ *Building Project Account*\\n' +\n    '• *Bank*: United Bank for Africa (UBA)\\n' +\n    '• *Account Number*: 1028494770\\n' +\n    '• *Account Name*: RCCG EVERFLOURISHING PROJECT\\n\\n' +\n    '_God bless you abundantly as you give to His work!_ ✨';\n  return [{ json: { is_direct: true, is_interactive: false, image_url: storageBase + '/Giving/Offering.png', direct_reply: replyText } }];\n}\n\n// ── 4b. FIRST TIMER / I'M NEW HERE FLOW ──\nif (\n  buttonId === 'btn_first_timer' ||\n  (!hasMedia && (\n    lowerText === \"i'm new here\" ||\n    lowerText === 'i am new here' ||\n    lowerText === 'im new here' ||\n    lowerText === 'new here' ||\n    lowerText === 'first timer' ||\n    lowerText === 'first time'\n  ))\n) {\n  const firstTimerReply = '🎉 *WELCOME TO RCCG EVERFLOURISHING MEGA SANCTUARY!* 🎉\\n\\n' +\n    'We are overjoyed to have you join us! At EVF Sanctuary, you are family, and we believe God brought you here for a glorious purpose.\\n\\n' +\n    '✨ *Our Weekly Services*:\\n' +\n    '• *Sundays*: 1st Service @ 8:00 AM | Sunday School @ 9:45 AM | 2nd Service @ 10:15 AM\\n' +\n    '• *Tuesdays (Digging Deep)*: 6:00 PM – 7:00 PM\\n' +\n    '• *Thursdays (Faith Clinic)*: 6:00 PM – 7:00 PM\\n\\n' +\n    '📍 *Location*: Main Sanctuary\\n' +\n    CHURCH_ADDRESS + '\\n\\n' +\n    'We would love to get to know you better! Please reply to us with:\\n' +\n    '1️⃣ *Your Full Name*\\n' +\n    '2️⃣ *Your Residential Location/Area*\\n' +\n    '3️⃣ *Any Prayer Request you would like us to pray for*\\n\\n' +\n    'God bless you richly! 🙏';\n\n  return [{\n    json: {\n      is_direct: true,\n      is_interactive: false,\n      image_url: storageBase + '/Service/First%20Service.jpg',\n      direct_reply: firstTimerReply\n    }\n  }];\n}\n\n// ── 5. GREETINGS & MENU ──\nconst isGreeting = ['hi', 'hello', 'hey', 'menu', 'start'].indexOf(lowerText) !== -1;\nif (!hasMedia && (isGreeting || buttonId === 'btn_menu')) {\n  return [{\n    json: {\n      is_direct: false,\n      is_interactive: true,\n      interactive_payload: {\n        messaging_product: 'whatsapp',\n        to: parsed.from_phone,\n        type: 'interactive',\n        interactive: {\n          type: 'button',\n          body: { text: 'Welcome to RCCG Everflourishing Mega Sanctuary! 🙏\\n\\nHow may we assist you today? Tap an option below, or feel free to type your question.' },\n          footer: { text: 'RCCG EVF Sanctuary' },\n          action: {\n            buttons: [\n              { type: 'reply', reply: { id: 'btn_services', title: 'Service Times' } },\n              { type: 'reply', reply: { id: 'btn_giving', title: 'Giving & Tithes' } },\n              { type: 'reply', reply: { id: 'btn_first_timer', title: \"I'm New Here\" } }\n            ]\n          }\n        }\n      }\n    }\n  }];\n}\n\n// ── 6. BUILD STRICTLY FAITH-BASED AI CONTEXT WITH MEMORY & VISION ──\nconst watTime = now.toLocaleString('en-US', {\n  timeZone: 'Africa/Lagos',\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\nconst specialProgramsBlock = specialPrograms\n  .map(function(p) {\n    const t = formatTimeRange(p.start_time, p.end_time);\n    const d = cleanDescription(p.description);\n    return '- ' + (p.title || '') + ' | Date: ' + (p.program_date || '') + (t ? (' | Time: ' + t) : '') + (d ? (' | Details: ' + d) : '');\n  })\n  .join('\\n');\n\nconst eventsBlock = dbEvents\n  .map(function(e) {\n    const t = formatTimeRange(e.start_time, e.end_time);\n    const d = cleanDescription(e.description);\n    return '- ' + (e.title || '') + ' | Date: ' + (e.event_date || '') + (t ? (' | Time: ' + t) : '') + (d ? (' | Details: ' + d) : '');\n  })\n  .join('\\n');\n\nconst knowledgeBlock = articles\n  .map(function(a) { return '• ' + a.title + ': ' + (a.markdown || '').slice(0, 300); })\n  .join('\\n');\n\nconst systemPrompt = `You are EVF Bot, the official, strictly faith-focused WhatsApp assistant for RCCG Everflourishing Mega Sanctuary.\n\nCURRENT TIME (WAT): ${watTime}\nCHURCH ADDRESS: ${CHURCH_ADDRESS}\n\nUPCOMING SPECIAL PROGRAMS:\n${specialProgramsBlock || 'None scheduled currently'}\n\nREGULAR WEEKLY SERVICES:\n- Sundays: 1st Service (8:00 AM), Sunday School (9:45 AM), 2nd Service (10:15 AM)\n- Tuesdays (Digging Deep Bible Study): 6:00 PM – 7:00 PM\n- Thursdays (Faith Clinic Miracle & Deliverance): 6:00 PM – 7:00 PM\n\nKNOWLEDGE HIGHLIGHTS:\n${knowledgeBlock}\n\nCORE INSTRUCTIONS & STRICT BOUNDARIES:\n1. CONVERSATION CONTEXT & QUIZ MEMORY:\n   - Always read and follow the full conversation history.\n   - If you previously asked a Bible Quiz question or trivia, evaluate the user's answer directly (e.g. if they say \"Noah\", tell them they are correct! 🎉 and give the next question or score).\n   - DO NOT confuse a quiz answer like \"Noah\" or short answers with someone introducing their name as a new visitor!\n2. READING IMAGES & FLYERS:\n   - If an image or flyer is attached to the user's message, carefully read and examine the text on the flyer (dates, themes, venue, speakers, RCCG convention/congress details) and answer the user's questions about that specific flyer accurately.\n3. STRICTLY CHURCH & FAITH SCOPE: You ONLY answer questions regarding RCCG church events, service times, location/directions, giving, pastorate, Christian doctrine, Bible scriptures, prayers, hymns, and spiritual counseling.\n4. REFUSE ALL SECULAR / OFF-TOPIC QUESTIONS: If the user asks about programming, coding (Python, JavaScript, etc.), mathematics, school homework, secular politics, secular news, entertainment, cryptocurrency, or non-church topics, you MUST POLITELY REFUSE.\n5. FIRST TIMERS: Only when a user explicitly introduces themselves as a first-time visitor or gives their name/area in response to the welcome prompt, warmly welcome them as family.\n6. FORMATTING: Use single asterisks for *bold*. Never use double asterisks (**bold**). No markdown headers (###). Never output raw URLs or [FLYER:...] tags. Keep answers warm, encouraging, concise, and scriptural.`;\n\n// ── ASSEMBLE OPENAI MESSAGES ARRAY (WITH HISTORY & VISION) ──\nconst rawHistory = safeAll(\"Fetch Recent Messages\").map(function(i) { return i.json; });\n// Sort ascending by time\nrawHistory.sort(function(a, b) {\n  return new Date(a.created_at || 0) - new Date(b.created_at || 0);\n});\n\n// Take the last 6 messages excluding the current one if already saved\nconst historyMessages = [];\nrawHistory.forEach(function(m) {\n  if (m && m.message && m.message.trim() !== '') {\n    const role = (m.sender === 'member') ? 'user' : 'assistant';\n    historyMessages.push({ role: role, content: m.message });\n  }\n});\n\n// Build latest user turn (with image vision payload if present)\nlet latestUserContent;\nif (incomingImageBase64) {\n  latestUserContent = [\n    {\n      type: \"text\",\n      text: userText || \"Please read and explain the details from this church flyer/image.\"\n    },\n    {\n      type: \"image_url\",\n      image_url: {\n        url: incomingImageBase64\n      }\n    }\n  ];\n} else {\n  latestUserContent = userText || \"Hello\";\n}\n\n// Assemble final messages payload\nconst openAiMessages = [\n  { role: \"system\", content: systemPrompt }\n];\n\n// Append recent history (up to last 5 history items)\nconst recentSlice = historyMessages.slice(-5);\nrecentSlice.forEach(function(h) {\n  openAiMessages.push(h);\n});\n\n// If the latest message is not already the last history item, append it\nconst lastHistory = recentSlice.length ? recentSlice[recentSlice.length - 1] : null;\nif (!lastHistory || lastHistory.role !== 'user' || lastHistory.content !== userText || incomingImageBase64) {\n  openAiMessages.push({ role: \"user\", content: latestUserContent });\n}\n\nreturn [{\n  json: {\n    is_direct: false,\n    is_interactive: false,\n    system_prompt: systemPrompt,\n    user_message: userText,\n    messages: openAiMessages\n  }\n}];"
+      },
+      "id": "52ac2847-b821-410e-9838-252e2045436e",
+      "name": "Build AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10608,
+        2400
+      ]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/chat/completions",
         "sendHeaders": true,
@@ -1318,18 +1466,18 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"model\": \"gpt-5.4-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": {{ JSON.stringify($('Build AI Context').first().json.system_prompt || $json.system_prompt) }}\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($('Build AI Context').first().json.user_message || $json.user_message) }}\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": {{ JSON.stringify($('Build AI Context').first().json.messages) }}\n}",
         "options": {
-          "timeout": 25000
+          "timeout": 30000
         }
       },
-      "id": "f8d8392a-3021-483a-939e-8c3817f09312",
+      "id": "11ae993d-553e-4493-b320-a9735be8cdab",
       "name": "Call AI (OpenAI)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4704,
-        1120
+        10832,
+        2448
       ],
       "retryOnFail": true,
       "maxTries": 2,
@@ -1595,7 +1743,7 @@
       "main": [
         [
           {
-            "node": "Build AI Context",
+            "node": "Fetch Recent Messages",
             "type": "main",
             "index": 0
           }
@@ -1870,6 +2018,68 @@
         [
           {
             "node": "AI Fallback Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Has Incoming Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Incoming Image?": {
+      "main": [
+        [
+          {
+            "node": "Get WhatsApp Media URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get WhatsApp Media URL": {
+      "main": [
+        [
+          {
+            "node": "Download WhatsApp Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download WhatsApp Media": {
+      "main": [
+        [
+          {
+            "node": "Encode Image Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode Image Base64": {
+      "main": [
+        [
+          {
+            "node": "Build AI Context",
             "type": "main",
             "index": 0
           }
