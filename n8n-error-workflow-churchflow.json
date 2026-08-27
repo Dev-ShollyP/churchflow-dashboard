@@ -1,0 +1,156 @@
+{
+  "name": "ChurchFlow - Error Handler & Admin Alert",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e1a90f23-8c45-4df6-817c-errortrigger01",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst execution = input.execution || {};\nconst workflow = input.workflow || {};\nconst error = execution.error || {};\n\n// Format Lagos WAT Time\nconst now = new Date();\nconst watTimeStr = now.toLocaleString('en-US', {\n  timeZone: 'Africa/Lagos',\n  weekday: 'short',\n  month: 'short',\n  day: 'numeric',\n  year: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\nconst workflowName = workflow.name || 'ChurchFlow';\nconst failedNode = execution.lastNodeExecuted || error.node?.name || 'Unknown Node';\nconst rawErrMsg = error.message || error.description || 'An unexpected error occurred during workflow execution.';\nconst executionUrl = execution.url || `https://n8n.cloud/execution/${execution.id || ''}`;\nconst executionId = execution.id || 'N/A';\n\n// Clean and truncate error message if too long\nlet shortErr = rawErrMsg;\nif (shortErr.length > 400) {\n  shortErr = shortErr.substring(0, 397) + '...';\n}\n\n// Build WhatsApp notification text for Admin/Developer\nconst adminMessage = `🚨 *CHURCHFLOW AUTOMATION ALERT* 🚨\\n\\n` +\n  `An execution error occurred in the church WhatsApp system.\\n\\n` +\n  `📋 *Workflow*: ${workflowName}\\n` +\n  `⚙️ *Failed Node*: *${failedNode}*\\n` +\n  `⚠️ *Error*: ${shortErr}\\n` +\n  `🕒 *Time*: ${watTimeStr} WAT\\n` +\n  `🆔 *Execution ID*: \`${executionId}\`\\n\\n` +\n  `🔗 *View Execution in n8n*:\\n${executionUrl}`;\n\nreturn [{\n  json: {\n    workflow_name: workflowName,\n    failed_node: failedNode,\n    error_message: rawErrMsg,\n    execution_id: executionId,\n    execution_url: executionUrl,\n    wat_time: watTimeStr,\n    admin_whatsapp_message: adminMessage\n  }\n}];"
+      },
+      "id": "b2c89012-7d34-4bc5-9012-formatdetails02",
+      "name": "Format Error Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$vars.SUPABASE_URL}}/rest/v1/whatsapp_sessions?select=phone_number_id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c3d90123-6e45-4cd6-9123-getphonesess03",
+      "name": "Get Phone Number ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        300
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sessionData = $input.first().json;\nlet phoneId = Array.isArray(sessionData) ? sessionData[0]?.phone_number_id : sessionData?.phone_number_id;\n\nif (!phoneId) {\n  phoneId = $vars.WHATSAPP_PHONE_NUMBER_ID || '1252855381239526';\n}\n\n// Read Admin Phone number from n8n variable or fallback\nlet adminPhone = ($vars.ADMIN_PHONE || $vars.WHATSAPP_ADMIN_PHONE || '2347030125009').replace(/[^0-9]/g, '');\nif (adminPhone.startsWith('0') && adminPhone.length === 11) {\n  adminPhone = '234' + adminPhone.slice(1);\n}\n\nconst formatted = $('Format Error Details').first().json;\n\nreturn [{\n  json: {\n    phone_number_id: phoneId,\n    admin_phone: adminPhone,\n    message: formatted.admin_whatsapp_message,\n    workflow_name: formatted.workflow_name,\n    failed_node: formatted.failed_node,\n    error_message: formatted.error_message,\n    execution_id: formatted.execution_id,\n    execution_url: formatted.execution_url\n  }\n}];"
+      },
+      "id": "d4e01234-5f56-4de7-9234-prepadminmsg04",
+      "name": "Prepare Admin WhatsApp Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{$json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.WHATSAPP_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', to: $json.admin_phone, type: 'text', text: { body: $json.message } } }}",
+        "options": {}
+      },
+      "id": "e5f12345-4a67-4ef8-9345-sendadminwa05",
+      "name": "Send WhatsApp Alert to Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Details": {
+      "main": [
+        [
+          {
+            "node": "Get Phone Number ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Phone Number ID": {
+      "main": [
+        [
+          {
+            "node": "Prepare Admin WhatsApp Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Admin WhatsApp Payload": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Alert to Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e9124a1b-04f8-42bc-90a1-errorflow001",
+  "tags": []
+}
