@@ -313,6 +313,7 @@ export default function BroadcastsPage() {
         body: JSON.stringify({
           broadcast_id: testBroadcastId,
           test_phone: testPhone,
+          custom_title: selectedPreview.title,
           custom_message: selectedPreview.message,
           custom_image_url: selectedPreview.image_url
         })
@@ -914,6 +915,9 @@ export default function BroadcastsPage() {
                     onChange={e => setTestPhone(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl text-white bg-black/60 border border-white/20 text-sm font-mono focus:outline-none focus:border-gold/60 placeholder-white/30"
                   />
+                  <p className="text-[11px] text-zinc-400 mt-1.5 flex items-center gap-1">
+                    <span>💡 Sent via official WhatsApp template. If testing full multiline layout, send &quot;Hi&quot; to church number (+234 810 338 6751) first.</span>
+                  </p>
                 </div>
 
                 {testResult && (
