@@ -78,7 +78,7 @@ export const WEEKLY_SERVICES = [
     endTime: '19:00',
     location: 'Main Sanctuary',
     description: 'Intercession, Divine Healing & Deliverance Service',
-    flyerUrl: STORAGE_BASE + '/Service/faith%20clinic.jpg',
+    flyerUrl: STORAGE_BASE + '/Service/Faith%20Clinic.jpeg',
   },
   {
     dayOfWeek: 0, // Sunday
