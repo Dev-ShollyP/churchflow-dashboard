@@ -29,7 +29,7 @@ function getSundayServiceType(date: Date): { title: string; description: string;
       return {
         title: '1st Sunday — Thanksgiving Service',
         description: 'Glorious Celebration: Praise, Worship & Thanksgiving Offering',
-        flyerUrl: STORAGE_BASE + '/Service/Thanks.jpg',
+        flyerUrl: STORAGE_BASE + '/Service/Thanks.jpeg',
       };
     case 2:
       return {
