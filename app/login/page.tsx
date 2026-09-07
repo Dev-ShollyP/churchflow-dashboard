@@ -124,9 +124,10 @@ export default function LoginPage() {
         {/* Logo & Header */}
         <div className="text-center mb-8">
           <div
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-gold overflow-hidden bg-black/50 border border-white/10 p-1"
+            className="relative inline-flex items-center justify-center w-24 h-24 rounded-3xl mb-4 p-2.5 backdrop-blur-2xl bg-gradient-to-b from-white/15 via-white/5 to-white/[0.02] border border-white/20 shadow-[0_8px_32px_0_rgba(212,175,55,0.2),inset_0_1px_1px_0_rgba(255,255,255,0.4)] hover:border-gold/40 transition-all duration-300"
           >
-            <img src={CHURCH_LOGO_URL} alt="RCCG EVF Sanctuary" className="w-full h-full object-contain" />
+            <div className="absolute inset-0 rounded-3xl bg-gold/15 blur-xl -z-10" />
+            <img src={CHURCH_LOGO_URL} alt="RCCG EVF Sanctuary" className="w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]" />
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">Staff Portal</h1>
           <p className="text-xs sm:text-sm text-white/50 mt-1 font-medium">RCCG Everflourishing Sanctuary</p>
