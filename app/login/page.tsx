@@ -123,10 +123,9 @@ export default function LoginPage() {
         {/* Logo & Header */}
         <div className="text-center mb-8">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-gold"
-            style={{ background: 'linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold-dark))' }}
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-gold overflow-hidden bg-black/50 border border-white/10 p-1"
           >
-            <Sparkles className="w-8 h-8 text-slate-950" />
+            <img src="/logo.png" alt="RCCG EVF Sanctuary" className="w-full h-full object-contain" />
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">Staff Portal</h1>
           <p className="text-xs sm:text-sm text-white/50 mt-1 font-medium">RCCG Everflourishing Sanctuary</p>
