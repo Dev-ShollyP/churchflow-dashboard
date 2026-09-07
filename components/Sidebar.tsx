@@ -108,9 +108,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="flex items-center justify-between px-5 py-4 sm:py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-gold overflow-hidden bg-black/40 border border-white/10 p-0.5"
+              className="relative w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 p-1 backdrop-blur-xl bg-gradient-to-b from-white/15 via-white/5 to-white/[0.02] border border-white/20 shadow-[0_4px_16px_0_rgba(212,175,55,0.2),inset_0_1px_1px_0_rgba(255,255,255,0.35)]"
             >
-              <img src={CHURCH_LOGO_URL} alt="RCCG EVF" className="w-full h-full object-contain" />
+              <div className="absolute inset-0 rounded-2xl bg-gold/10 blur-md -z-10" />
+              <img src={CHURCH_LOGO_URL} alt="RCCG EVF" className="w-full h-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-display font-bold text-sm text-gold leading-tight tracking-wide">RCCG EVF</p>
