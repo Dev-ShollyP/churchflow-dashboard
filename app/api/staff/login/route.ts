@@ -3,80 +3,73 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+    const identifier = (body.username || body.email || '').trim().toLowerCase();
+    const password = body.password;
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    if (!identifier || !password) {
+      return NextResponse.json({ error: 'Username and password are required' }, { status: 400 });
     }
-
-    const cleanEmail = email.trim().toLowerCase();
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // PRIMARY: Check staff table for email + password
-    const { data: staffData, error: staffError } = await supabase
+    // PRIMARY: Check staff table for username/email match (case-insensitive)
+    const { data: staffList, error: staffError } = await supabase
       .from('staff')
       .select('*')
-      .eq('email', cleanEmail)
-      .single();
+      .or(`email.ilike.${identifier},full_name.ilike.${identifier}`);
+
+    const staffData = staffList && staffList.length > 0 ? staffList[0] : null;
 
     if (staffData) {
-      // Staff member found in database
       const storedPassword = staffData.password_hash;
 
+      // If no password was set, allow login
       if (!storedPassword) {
-        // Staff exists but has no password set yet — allow login for now
-        // and prompt admin to set their password
         return NextResponse.json({
           success: true,
-          email: cleanEmail,
-          role: staffData.role,
-          warning: 'No password set. Please ask Admin to set your password via Staff & Permissions page.'
-        });
-      }
-
-      // Verify password (plain text comparison — simple but works for now)
-      if (storedPassword === password) {
-        return NextResponse.json({
-          success: true,
-          email: cleanEmail,
+          username: staffData.email,
+          email: staffData.email,
           role: staffData.role,
           name: staffData.full_name,
         });
       }
 
-      // Wrong password
+      // Plain text password comparison
+      if (storedPassword === password) {
+        return NextResponse.json({
+          success: true,
+          username: staffData.email,
+          email: staffData.email,
+          role: staffData.role,
+          name: staffData.full_name,
+        });
+      }
+
       return NextResponse.json({
-        error: 'Incorrect password. Please try again or contact your church administrator.'
+        error: 'Incorrect password. Please try again or ask your church administrator to reset it.'
       }, { status: 401 });
     }
 
-    // SUPERADMIN fallback: hardcoded admin emails can use Supabase Auth
-    const isAdminEmail = cleanEmail.includes('everflourishingarea') || cleanEmail.includes('olushola');
+    // SUPERADMIN fallback
+    const isAdmin = identifier.includes('everflourishingarea') || identifier.includes('olushola') || identifier === 'admin';
 
-    if (isAdminEmail) {
-      // Try Supabase Auth
+    if (isAdmin) {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
+        email: identifier.includes('@') ? identifier : `${identifier}@churchflow.internal`,
         password,
       });
 
       if (!authError && authData?.user) {
-        return NextResponse.json({ success: true, email: cleanEmail, role: 'developer' });
+        return NextResponse.json({ success: true, username: identifier, email: identifier, role: 'developer' });
       }
-
-      // If Supabase auth fails too, try staff table again with wider search
-      return NextResponse.json({
-        error: 'Invalid credentials. Please check your email and password.'
-      }, { status: 401 });
     }
 
-    // Not in staff table at all
     return NextResponse.json({
-      error: 'This email is not registered in the Church Staff directory. Please ask an Admin to add you under Staff & Permissions.'
+      error: `Username "${identifier}" is not found in the Church Staff directory. Ask an Admin to add you under Staff & Permissions.`
     }, { status: 404 });
 
   } catch (err: any) {
