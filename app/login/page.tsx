@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { Eye, EyeOff, LogIn, KeyRound, ShieldAlert, CheckCircle2, AlertCircle, X, Sparkles } from 'lucide-react';
+import { CHURCH_LOGO_URL } from '@/lib/branding';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -125,7 +126,7 @@ export default function LoginPage() {
           <div
             className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-gold overflow-hidden bg-black/50 border border-white/10 p-1"
           >
-            <img src="/logo.png" alt="RCCG EVF Sanctuary" className="w-full h-full object-contain" />
+            <img src={CHURCH_LOGO_URL} alt="RCCG EVF Sanctuary" className="w-full h-full object-contain" />
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">Staff Portal</h1>
           <p className="text-xs sm:text-sm text-white/50 mt-1 font-medium">RCCG Everflourishing Sanctuary</p>
