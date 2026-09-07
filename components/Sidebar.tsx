@@ -8,6 +8,7 @@ import {
   Settings, LogOut, ChevronRight, UploadCloud, QrCode, UserCheck, Shield, X, Sparkles, BookOpen, Megaphone
 } from 'lucide-react';
 import { getCurrentStaff, StaffMember, PermissionKey, roleLabels, hasPermission, isAdmin } from '@/lib/supabase';
+import { CHURCH_LOGO_URL } from '@/lib/branding';
 import ThemeSwitcher from './ThemeSwitcher';
 
 interface NavItem {
@@ -109,7 +110,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-gold overflow-hidden bg-black/40 border border-white/10 p-0.5"
             >
-              <img src="/logo.png" alt="RCCG EVF" className="w-full h-full object-contain" />
+              <img src={CHURCH_LOGO_URL} alt="RCCG EVF" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-display font-bold text-sm text-gold leading-tight tracking-wide">RCCG EVF</p>
