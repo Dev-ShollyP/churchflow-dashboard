@@ -107,10 +107,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="flex items-center justify-between px-5 py-4 sm:py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-gold"
-              style={{ background: 'linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold-dark))' }}
+              className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-gold overflow-hidden bg-black/40 border border-white/10 p-0.5"
             >
-              <Sparkles className="w-5 h-5 text-slate-950" />
+              <img src="/logo.png" alt="RCCG EVF" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-display font-bold text-sm text-gold leading-tight tracking-wide">RCCG EVF</p>
