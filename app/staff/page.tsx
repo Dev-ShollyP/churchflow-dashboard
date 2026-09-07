@@ -30,7 +30,7 @@ export default function StaffManagementPage() {
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionKey[]>([]);
   const [updatingPermissions, setUpdatingPermissions] = useState(false);
 
-  const [newEmail, setNewEmail] = useState('');
+  const [newUsername, setNewUsername] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<StaffRole>('followup_team');
   const [newPassword, setNewPassword] = useState('');
@@ -43,8 +43,8 @@ export default function StaffManagementPage() {
   const [settingPassword, setSettingPassword] = useState(false);
 
   const handleSetExistingPassword = async () => {
-    if (!setPasswordTarget || !resetPassword || resetPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters.' });
+    if (!setPasswordTarget || !resetPassword || resetPassword.length < 4) {
+      setMessage({ type: 'error', text: 'Password must be at least 4 characters.' });
       return;
     }
     setSettingPassword(true);
@@ -53,7 +53,7 @@ export default function StaffManagementPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: setPasswordTarget.email,
+          username: setPasswordTarget.email,
           password: resetPassword,
           name: setPasswordTarget.full_name,
           role: setPasswordTarget.role,
@@ -61,7 +61,7 @@ export default function StaffManagementPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMessage({ type: 'success', text: `✅ Password set for ${setPasswordTarget.email}. They can now sign in!` });
+      setMessage({ type: 'success', text: `✅ Password set for ${setPasswordTarget.email}. They can now sign in immediately!` });
       setSetPasswordTarget(null);
       setResetPassword('');
     } catch (err: any) {
@@ -169,9 +169,9 @@ export default function StaffManagementPage() {
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmail) return;
-    if (!newPassword || newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters.' });
+    if (!newUsername.trim()) return;
+    if (!newPassword || newPassword.length < 4) {
+      setMessage({ type: 'error', text: 'Password must be at least 4 characters.' });
       return;
     }
 
@@ -179,13 +179,14 @@ export default function StaffManagementPage() {
     setMessage(null);
 
     try {
+      const cleanUsername = newUsername.trim().toLowerCase();
       const res = await fetch('/api/staff/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: newEmail.trim().toLowerCase(),
+          username: cleanUsername,
           password: newPassword,
-          name: newName,
+          name: newName.trim() || cleanUsername,
           role: newRole,
         }),
       });
@@ -194,8 +195,8 @@ export default function StaffManagementPage() {
 
       if (!res.ok) throw new Error(data.error || 'Failed to add staff member.');
 
-      setMessage({ type: 'success', text: `✅ Account created for ${newEmail}! They can now sign in with the password you set.` });
-      setNewEmail('');
+      setMessage({ type: 'success', text: `✅ Account created for "${cleanUsername}"! They can now log in immediately with their username and password.` });
+      setNewUsername('');
       setNewName('');
       setNewPassword('');
       fetchStaff();
@@ -330,16 +331,20 @@ export default function StaffManagementPage() {
 
             <div>
               <label className="block text-xs font-semibold text-white/60 uppercase tracking-wide mb-1">
-                Email Address *
+                Username *
               </label>
               <input
-                type="email"
+                type="text"
                 required
-                value={newEmail}
-                onChange={e => setNewEmail(e.target.value)}
-                placeholder="team@evfsanctuary.org"
+                value={newUsername}
+                onChange={e => setNewUsername(e.target.value)}
+                placeholder="e.g. pastor_ayo or media_team"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 className="w-full px-3.5 py-2 rounded-xl text-sm text-white placeholder-white/30 bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
               />
+              <p className="text-[10px] text-white/30 mt-1">Used to log in to this dashboard immediately (no email verification required).</p>
             </div>
 
             <div>
