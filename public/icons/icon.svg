@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080C16" />
+      <stop offset="50%" stop-color="#050811" />
+      <stop offset="100%" stop-color="#020408" />
+    </linearGradient>
+    <linearGradient id="goldSheen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF4D0" />
+      <stop offset="25%" stop-color="#FCD34D" />
+      <stop offset="65%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="coreGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Dark Squircle Background matching TikTok style -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="#222B3E" stroke-width="3" />
+
+  <!-- Ambient Glow Behind Emblem -->
+  <circle cx="256" cy="246" r="140" fill="#F59E0B" opacity="0.14" filter="url(#goldGlow)" />
+
+  <!-- Sanctuary Flow Ring / Arch of Light -->
+  <path d="M 120 280 A 150 130 0 0 0 392 280" fill="none" stroke="url(#goldSheen)" stroke-width="12" stroke-linecap="round" opacity="0.6" />
+  <path d="M 150 310 A 120 100 0 0 0 362 310" fill="none" stroke="url(#goldSheen)" stroke-width="7" stroke-linecap="round" opacity="0.35" />
+
+  <!-- The Golden Cross -->
+  <g filter="url(#goldGlow)">
+    <!-- Vertical Beam -->
+    <rect x="226" y="112" width="60" height="288" rx="12" fill="url(#goldSheen)" />
+    <!-- Horizontal Beam -->
+    <rect x="160" y="196" width="192" height="60" rx="12" fill="url(#goldSheen)" />
+  </g>
+
+  <!-- Radiant Light Centerpiece -->
+  <circle cx="256" cy="226" r="22" fill="#FFFFFF" opacity="0.9" filter="url(#coreGlow)" />
+  <polygon points="256,192 262,220 290,226 262,232 256,260 250,232 222,226 250,220" fill="#FFFBEB" />
+</svg>
