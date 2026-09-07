@@ -6,7 +6,7 @@ import { Eye, EyeOff, LogIn, KeyRound, ShieldAlert, CheckCircle2, AlertCircle, X
 import { CHURCH_LOGO_URL } from '@/lib/branding';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -14,15 +14,15 @@ export default function LoginPage() {
 
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotTab, setForgotTab] = useState<'staff' | 'admin'>('staff');
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetUsername, setResetUsername] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [resetMasterKey, setResetMasterKey] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const setAuthSessionCookie = (userEmail: string) => {
+  const setAuthSessionCookie = (userIdentifier: string) => {
     document.cookie = `churchflow_staff_session=true; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-    document.cookie = `churchflow_staff_email=${encodeURIComponent(userEmail)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    document.cookie = `churchflow_staff_email=${encodeURIComponent(userIdentifier)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -30,44 +30,64 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase();
 
-    if (!password || password.length < 3) {
+    if (!cleanUsername) {
+      setError('Please enter your username.');
+      setLoading(false);
+      return;
+    }
+
+    if (!password) {
       setError('Please enter your password.');
       setLoading(false);
       return;
     }
 
     try {
+      // 1. Authenticate via server API
+      const res = await fetch('/api/staff/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: cleanUsername,
+          password: password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setAuthSessionCookie(data.username || data.email || cleanUsername);
+        window.location.href = '/';
+        return;
+      }
+
+      // 2. Direct Supabase fallback
       const supabase = createClient();
-      const { data: staffData, error: dbError } = await supabase
+      const { data: staffList } = await supabase
         .from('staff')
         .select('email, full_name, role, password_hash')
-        .eq('email', cleanEmail)
-        .single();
+        .or(`email.ilike.${cleanUsername},full_name.ilike.${cleanUsername}`);
 
-      if (dbError || !staffData) {
-        setError('This email is not in the Church Staff directory. Ask your Admin to add you under Staff & Permissions.');
+      const staffData = staffList && staffList.length > 0 ? staffList[0] : null;
+
+      if (!staffData) {
+        setError(data.error || `Username "${cleanUsername}" is not registered. Ask your church administrator to add you.`);
         setLoading(false);
         return;
       }
 
       const storedPassword = staffData.password_hash;
 
-      if (!storedPassword) {
-        setAuthSessionCookie(cleanEmail);
+      if (!storedPassword || storedPassword === password) {
+        setAuthSessionCookie(staffData.email || cleanUsername);
         window.location.href = '/';
         return;
       }
 
-      if (storedPassword !== password) {
-        setError('Incorrect password. Click "Forgot Password?" below or ask your Admin to reset it.');
-        setLoading(false);
-        return;
-      }
-
-      setAuthSessionCookie(cleanEmail);
-      window.location.href = '/';
+      setError(data.error || 'Incorrect password. Ask your Admin to reset it.');
+      setLoading(false);
 
     } catch (err: any) {
       setError('Unable to connect. Please check your internet connection and try again.');
@@ -85,7 +105,7 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: resetEmail.trim(),
+          email: resetUsername.trim(),
           new_password: resetNewPassword,
           master_key: resetMasterKey,
         }),
@@ -98,7 +118,7 @@ export default function LoginPage() {
       }
 
       setResetMessage({ type: 'success', text: data.message });
-      setEmail(resetEmail);
+      setUsername(resetUsername);
       setPassword(resetNewPassword);
       setTimeout(() => {
         setShowForgotModal(false);
@@ -137,16 +157,19 @@ export default function LoginPage() {
         <div className="glass-card p-6 sm:p-8">
           <form onSubmit={handleLogin} className="space-y-4.5">
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-white/60 mb-1.5 uppercase tracking-wide">
-                Email Address
+              <label htmlFor="username" className="block text-xs font-semibold text-white/60 mb-1.5 uppercase tracking-wide">
+                Username
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
                 required
-                placeholder="your@email.com"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="e.g. pastor_ayo, media_team, or email"
                 className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/30 bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none transition-colors"
               />
             </div>
@@ -158,7 +181,7 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => { setShowForgotModal(true); setResetEmail(email); }}
+                  onClick={() => { setShowForgotModal(true); setResetUsername(username); }}
                   className="text-xs text-gold hover:underline font-semibold"
                 >
                   Forgot Password?
@@ -199,160 +222,154 @@ export default function LoginPage() {
               {loading ? (
                 <div className="w-4.5 h-4.5 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
               ) : (
-                <LogIn size={16} />
+                <>
+                  <LogIn size={16} />
+                  <span>Sign In</span>
+                </>
               )}
-              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-white/30 mt-6 font-medium">
+        <p className="text-center text-xs text-white/40 mt-6">
           ChurchFlow Dashboard v1.0 • Everflourishing Sanctuary
         </p>
       </div>
 
       {/* Forgot Password Modal */}
       {showForgotModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="glass-card w-full max-w-md p-6 space-y-4 animate-popover border border-gold/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="glass-card max-w-sm w-full p-6 space-y-4 animate-popover border border-gold/30">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <KeyRound size={18} className="text-gold" />
-                <h3 className="font-display font-semibold text-white text-base">Reset Password</h3>
-              </div>
+              <h3 className="font-display font-semibold text-white text-base flex items-center gap-2">
+                <KeyRound size={17} className="text-gold" /> Reset Password
+              </h3>
               <button
-                onClick={() => setShowForgotModal(false)}
+                onClick={() => { setShowForgotModal(false); setResetMessage(null); }}
                 className="text-white/40 hover:text-white transition-colors"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Tabs */}
+            {/* Tab switch */}
             <div className="flex rounded-xl bg-black/40 p-1 border border-white/10">
               <button
                 type="button"
-                onClick={() => setForgotTab('staff')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  forgotTab === 'staff' ? 'btn-gold shadow-gold' : 'text-white/50 hover:text-white'
+                onClick={() => { setForgotTab('staff'); setResetMessage(null); }}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  forgotTab === 'staff'
+                    ? 'bg-gold text-slate-950 shadow-sm'
+                    : 'text-white/60 hover:text-white'
                 }`}
               >
-                Staff Reset
+                Staff Member
               </button>
               <button
                 type="button"
-                onClick={() => setForgotTab('admin')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  forgotTab === 'admin' ? 'btn-gold shadow-gold' : 'text-white/50 hover:text-white'
+                onClick={() => { setForgotTab('admin'); setResetMessage(null); }}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  forgotTab === 'admin'
+                    ? 'bg-gold text-slate-950 shadow-sm'
+                    : 'text-white/60 hover:text-white'
                 }`}
               >
-                Admin Lockout Help
+                Admin Recovery
               </button>
             </div>
 
-            {resetMessage && (
-              <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
-                resetMessage.type === 'success'
-                  ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
-                  : 'bg-red-500/15 border border-red-500/30 text-red-300'
-              }`}>
-                {resetMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                <span>{resetMessage.text}</span>
-              </div>
-            )}
-
             {forgotTab === 'staff' ? (
+              <div className="space-y-3 text-xs text-white/70">
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                  <p className="font-semibold text-white">How to reset your password:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-white/60">
+                    <li>Contact your Church Administrator.</li>
+                    <li>They will open <span className="text-gold font-medium">Staff & Permissions</span>.</li>
+                    <li>They will click <span className="text-gold font-medium">Set Password</span> next to your account to assign a new password immediately.</li>
+                  </ol>
+                </div>
+                <button
+                  onClick={() => setShowForgotModal(false)}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold btn-gold shadow-gold mt-2"
+                >
+                  Got It
+                </button>
+              </div>
+            ) : (
               <form onSubmit={handlePasswordReset} className="space-y-3">
-                <p className="text-xs text-white/60 leading-relaxed">
-                  Enter your email address and new password to reset your login credentials.
+                <p className="text-xs text-white/60">
+                  Church Admins can reset credentials using their Master Admin Key.
                 </p>
 
                 <div>
-                  <label className="block text-xs font-semibold text-white/60 mb-1 uppercase tracking-wide">
-                    Registered Email
+                  <label className="block text-[11px] font-semibold text-white/60 uppercase tracking-wide mb-1">
+                    Username / Account *
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    value={resetEmail}
-                    onChange={e => setResetEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="w-full px-3 py-2 rounded-xl text-xs text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                    value={resetUsername}
+                    onChange={e => setResetUsername(e.target.value)}
+                    placeholder="e.g. pastor_ayo or email"
+                    className="w-full px-3 py-2 rounded-xl text-xs text-white placeholder-white/30 bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-white/60 mb-1 uppercase tracking-wide">
-                    New Password
+                  <label className="block text-[11px] font-semibold text-white/60 uppercase tracking-wide mb-1">
+                    New Password *
                   </label>
                   <input
                     type="password"
                     required
-                    minLength={4}
                     value={resetNewPassword}
                     onChange={e => setResetNewPassword(e.target.value)}
-                    placeholder="Min 4 characters"
-                    className="w-full px-3 py-2 rounded-xl text-xs text-white bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                    placeholder="Min. 4 characters"
+                    className="w-full px-3 py-2 rounded-xl text-xs text-white placeholder-white/30 bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-white/60 uppercase tracking-wide mb-1">
+                    Master Admin Key *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={resetMasterKey}
+                    onChange={e => setResetMasterKey(e.target.value)}
+                    placeholder="Enter Admin Master Key"
+                    className="w-full px-3 py-2 rounded-xl text-xs text-white placeholder-white/30 bg-black/40 border border-white/10 focus:border-gold/50 focus:outline-none"
+                  />
+                </div>
+
+                {resetMessage && (
+                  <div className={`p-2.5 rounded-xl text-xs font-medium ${
+                    resetMessage.type === 'success'
+                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                      : 'bg-red-500/15 border border-red-500/30 text-red-300'
+                  }`}>
+                    {resetMessage.text}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium btn-glass"
+                    onClick={() => { setShowForgotModal(false); setResetMessage(null); }}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold btn-glass"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={resetLoading}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold shadow-gold disabled:opacity-50"
                   >
-                    {resetLoading ? 'Resetting...' : 'Reset My Password'}
+                    {resetLoading ? 'Resetting...' : 'Reset Password'}
                   </button>
                 </div>
               </form>
-            ) : (
-              <div className="space-y-3 text-xs leading-relaxed text-white/70">
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 space-y-1">
-                  <p className="font-semibold flex items-center gap-1.5">
-                    <ShieldAlert size={14} /> Admin Password Recovery
-                  </p>
-                  <p className="text-[11px] text-amber-200/80">
-                    If you are the Church Admin and cannot log in:
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="p-3 rounded-xl bg-black/40 border border-white/10">
-                    <p className="font-semibold text-gold mb-1">Option 1: Direct Reset via Staff Email</p>
-                    <p className="text-[11px] text-white/50">
-                      Use the "Staff Reset" tab above with your Admin email to set a new password directly.
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-black/40 border border-white/10">
-                    <p className="font-semibold text-gold mb-1">Option 2: Supabase SQL Editor</p>
-                    <p className="text-[11px] text-white/50 mb-1.5">
-                      Run this query in your Supabase SQL Editor:
-                    </p>
-                    <pre className="p-2 rounded bg-black/70 text-emerald-400 font-mono text-[10px] overflow-x-auto select-all">
-                      UPDATE public.staff SET password_hash = 'NewAdmin123' WHERE role = 'admin';
-                    </pre>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold btn-gold"
-                  >
-                    Close &amp; Try Login
-                  </button>
-                </div>
-              </div>
             )}
           </div>
         </div>
