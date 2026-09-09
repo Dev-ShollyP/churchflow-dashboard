@@ -242,6 +242,9 @@ export default function EventsPage() {
       sTime = parts[0].trim();
       eTime = (parts[1] || '21:00').trim();
     }
+    if (sTime.length > 5) {
+      sTime = sTime.substring(0, 5);
+    }
 
     setEditingProgram(prog);
     setForm({
@@ -381,7 +384,11 @@ export default function EventsPage() {
       activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
     }
 
-    const timeFormatted = form.start_time ? (form.end_time ? `${form.start_time} - ${form.end_time}` : form.start_time) : null;
+    let cleanStartTime = '18:00:00';
+    if (form.start_time) {
+      const raw = form.start_time.split('-')[0].trim();
+      cleanStartTime = raw.length === 5 ? `${raw}:00` : raw;
+    }
 
     const payload: any = {
       branch_id: activeBranchId || DEFAULT_BRANCH_ID,
@@ -391,7 +398,7 @@ export default function EventsPage() {
       image_url: uploadedImageUrl || null,
       program_date: form.program_date || null,
       end_date: form.end_date || null,
-      start_time: timeFormatted,
+      start_time: cleanStartTime,
       verse: form.verse?.trim() || null,
       venue: form.venue?.trim() || 'Main Sanctuary',
       is_active: true,
@@ -424,6 +431,7 @@ export default function EventsPage() {
 
       if (sendBroadcast) {
         try {
+          const displayTime = form.start_time ? (form.end_time ? `${form.start_time} - ${form.end_time}` : form.start_time) : '6:00 PM';
           await fetch('/api/programs/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -433,7 +441,7 @@ export default function EventsPage() {
               description: form.description.trim(),
               program_date: form.program_date,
               end_date: form.end_date,
-              start_time: form.start_time,
+              start_time: displayTime,
               verse: form.verse,
               image_url: uploadedImageUrl || form.flyer_url,
               send_broadcast: true,
