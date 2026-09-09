@@ -80,6 +80,66 @@ function parseEventMeta(rawDescription?: string | null): { cleanDescription: str
   return { cleanDescription, embeddedFlyer, embeddedScripture };
 }
 
+/**
+ * Ensures time string is converted to valid SQL TIME (HH:MM:SS) format for Postgres.
+ * Never allows ranges like "18:00 - 21:00" to enter the TIME column.
+ */
+function parseTimeToSql(timeStr?: string | null): string | null {
+  if (!timeStr || !timeStr.trim()) return null;
+  const first = timeStr.split('-')[0].trim();
+
+  // Handle 12-hour format e.g. "05:00 PM", "5:00pm", "5pm"
+  const match12 = first.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2] || '00';
+    const seconds = match12[3] || '00';
+    const ampm = match12[4].toLowerCase();
+    if (ampm === 'pm' && hours < 12) hours += 12;
+    if (ampm === 'am' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}:${seconds}`;
+  }
+
+  // Handle 24-hour format e.g. "18:00", "18:00:00"
+  const match24 = first.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match24) {
+    const hours = String(parseInt(match24[1], 10)).padStart(2, '0');
+    const minutes = match24[2];
+    const seconds = match24[3] || '00';
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  return null;
+}
+
+/**
+ * Formats time string to user-friendly 12-hour format (e.g. "18:00:00" -> "6:00 PM")
+ */
+function formatDisplayTime(timeStr?: string | null): string {
+  if (!timeStr) return '';
+  const clean = timeStr.split('-')[0].trim();
+  const match24 = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match24) {
+    let hours = parseInt(match24[1], 10);
+    const minutes = match24[2];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes} ${ampm}`;
+  }
+  return timeStr;
+}
+
+/**
+ * Combines start and end time for readable display (e.g. "5:00 PM - 8:00 PM")
+ */
+function formatProgramTime(start?: string | null, end?: string | null): string {
+  if (!start && !end) return '';
+  const s = start ? formatDisplayTime(start) : '';
+  const e = end ? formatDisplayTime(end) : '';
+  if (s && e) return `${s} - ${e}`;
+  return s || e;
+}
+
 export default function EventsPage() {
   const [tab, setTab] = useState<'events' | 'programs'>('events');
 
@@ -169,7 +229,25 @@ export default function EventsPage() {
       .from('special_programs')
       .select('*')
       .order('created_at', { ascending: false });
-    setPrograms(data ?? []);
+
+    const fetched = (data ?? []).map((item: any) => {
+      let cleanDescription = item.description || '';
+      let embeddedEndTime: string | undefined = undefined;
+
+      const endMatch = cleanDescription.match(/\[END_TIME:\s*([^\]]+)\]/);
+      if (endMatch) {
+        embeddedEndTime = endMatch[1].trim();
+        cleanDescription = cleanDescription.replace(/\[END_TIME:\s*[^\]]+\]/g, '').trim();
+      }
+
+      return {
+        ...item,
+        description: cleanDescription,
+        end_time: item.end_time || embeddedEndTime,
+      };
+    });
+
+    setPrograms(fetched);
     setProgramsLoading(false);
   }
 
@@ -236,14 +314,15 @@ export default function EventsPage() {
 
   function handleOpenEditProgramModal(prog: SpecialProgram) {
     let sTime = prog.start_time || '18:00';
-    let eTime = '21:00';
     if (sTime.includes('-')) {
-      const parts = sTime.split('-');
-      sTime = parts[0].trim();
-      eTime = (parts[1] || '21:00').trim();
+      sTime = sTime.split('-')[0].trim();
     }
-    if (sTime.length > 5) {
+    if (sTime.length > 5 && sTime.includes(':')) {
       sTime = sTime.substring(0, 5);
+    }
+    let eTime = prog.end_time || '21:00';
+    if (eTime.length > 5 && eTime.includes(':')) {
+      eTime = eTime.substring(0, 5);
     }
 
     setEditingProgram(prog);
@@ -353,114 +432,120 @@ export default function EventsPage() {
     if (!form.title.trim()) return;
     setSaving(true);
 
-    let uploadedImageUrl = form.image_url;
-    if (imageFile) {
-      try {
-        const apiFormData = new FormData();
-        apiFormData.append('file', imageFile);
-        const res = await fetch('/api/events/upload', { method: 'POST', body: apiFormData });
-        const json = await res.json();
-        if (json.publicUrl) {
-          uploadedImageUrl = json.publicUrl;
-        } else {
+    try {
+      let uploadedImageUrl = form.image_url;
+      if (imageFile) {
+        try {
+          const apiFormData = new FormData();
+          apiFormData.append('file', imageFile);
+          const res = await fetch('/api/events/upload', { method: 'POST', body: apiFormData });
+          const json = await res.json();
+          if (json.publicUrl) {
+            uploadedImageUrl = json.publicUrl;
+          } else {
+            uploadedImageUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.readAsDataURL(imageFile);
+            });
+          }
+        } catch {
           uploadedImageUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target?.result as string);
             reader.readAsDataURL(imageFile);
           });
         }
-      } catch {
-        uploadedImageUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(imageFile);
-        });
-      }
-    }
-
-    let activeBranchId = branchId;
-    if (!activeBranchId) {
-      const { data: sess } = await supabase.from('whatsapp_sessions').select('branch_id').limit(1).single();
-      activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
-    }
-
-    let cleanStartTime = '18:00:00';
-    if (form.start_time) {
-      const raw = form.start_time.split('-')[0].trim();
-      cleanStartTime = raw.length === 5 ? `${raw}:00` : raw;
-    }
-
-    const payload: any = {
-      branch_id: activeBranchId || DEFAULT_BRANCH_ID,
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      flyer_url: form.flyer_url.trim() || null,
-      image_url: uploadedImageUrl || null,
-      program_date: form.program_date || null,
-      end_date: form.end_date || null,
-      start_time: cleanStartTime,
-      verse: form.verse?.trim() || null,
-      venue: form.venue?.trim() || 'Main Sanctuary',
-      is_active: true,
-    };
-
-    if (editingProgram) {
-      const { error: updateErr } = await supabase
-        .from('special_programs')
-        .update(payload)
-        .eq('id', editingProgram.id);
-
-      if (updateErr) {
-        setSaving(false);
-        showToast('error', updateErr.message);
-        return;
-      }
-      showToast('success', 'Special Program updated with flyer design!');
-    } else {
-      const { data: programData, error } = await supabase
-        .from('special_programs')
-        .insert(payload)
-        .select()
-        .single();
-
-      if (error) {
-        setSaving(false);
-        showToast('error', error.message);
-        return;
       }
 
-      if (sendBroadcast) {
-        try {
-          const displayTime = form.start_time ? (form.end_time ? `${form.start_time} - ${form.end_time}` : form.start_time) : '6:00 PM';
-          await fetch('/api/programs/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              program_id: programData?.id,
-              title: form.title.trim(),
-              description: form.description.trim(),
-              program_date: form.program_date,
-              end_date: form.end_date,
-              start_time: displayTime,
-              verse: form.verse,
-              image_url: uploadedImageUrl || form.flyer_url,
-              send_broadcast: true,
-            }),
-          });
-        } catch (notifyErr) {
-          console.error('Failed to dispatch broadcast notification:', notifyErr);
+      let activeBranchId = branchId;
+      if (!activeBranchId) {
+        const { data: sess } = await supabase.from('whatsapp_sessions').select('branch_id').limit(1).single();
+        activeBranchId = sess?.branch_id || DEFAULT_BRANCH_ID;
+      }
+
+      // Convert start_time into valid Postgres TIME (HH:MM:SS) format
+      const cleanStartTime = parseTimeToSql(form.start_time) || '18:00:00';
+
+      // Embed end_time safely into description metadata tag so Postgres TIME column doesn't error
+      let compositeDescription = form.description ? form.description.trim() : '';
+      if (form.end_time && form.end_time.trim()) {
+        compositeDescription += `\n[END_TIME:${form.end_time.trim()}]`;
+      }
+
+      const payload: any = {
+        branch_id: activeBranchId || DEFAULT_BRANCH_ID,
+        title: form.title.trim(),
+        description: compositeDescription || null,
+        flyer_url: form.flyer_url.trim() || null,
+        image_url: uploadedImageUrl || null,
+        program_date: form.program_date || null,
+        end_date: form.end_date || null,
+        start_time: cleanStartTime,
+        verse: form.verse?.trim() || null,
+        venue: form.venue?.trim() || 'Main Sanctuary',
+        is_active: true,
+      };
+
+      if (editingProgram) {
+        const { error: updateErr } = await supabase
+          .from('special_programs')
+          .update(payload)
+          .eq('id', editingProgram.id);
+
+        if (updateErr) {
+          showToast('error', updateErr.message);
+          return;
         }
-      }
-      showToast('success', sendBroadcast ? 'Special Program created & WhatsApp broadcast queued!' : 'Special Program created!');
-    }
+        showToast('success', 'Special Program updated with flyer design!');
+      } else {
+        const { data: programData, error } = await supabase
+          .from('special_programs')
+          .insert(payload)
+          .select()
+          .single();
 
-    setSaving(false);
-    setShowModal(false);
-    setEditingProgram(null);
-    setForm(defaultProgramForm);
-    setImageFile(null);
-    setImagePreview(null);
-    loadPrograms();
+        if (error) {
+          showToast('error', error.message);
+          return;
+        }
+
+        if (sendBroadcast) {
+          try {
+            const displayTime = formatProgramTime(form.start_time, form.end_time) || '6:00 PM';
+            await fetch('/api/programs/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                program_id: programData?.id,
+                title: form.title.trim(),
+                description: form.description.trim(),
+                program_date: form.program_date,
+                end_date: form.end_date,
+                start_time: displayTime,
+                verse: form.verse,
+                image_url: uploadedImageUrl || form.flyer_url,
+                send_broadcast: true,
+              }),
+            });
+          } catch (notifyErr) {
+            console.error('Failed to dispatch broadcast notification:', notifyErr);
+          }
+        }
+        showToast('success', sendBroadcast ? 'Special Program created & WhatsApp broadcast queued!' : 'Special Program created!');
+      }
+
+      setShowModal(false);
+      setEditingProgram(null);
+      setForm(defaultProgramForm);
+      setImageFile(null);
+      setImagePreview(null);
+      loadPrograms();
+    } catch (e: any) {
+      showToast('error', e.message || 'Failed to save special program.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDeleteProgram(id: string) {
@@ -770,7 +855,7 @@ export default function EventsPage() {
                         {prog.start_time && (
                           <div className="flex items-center gap-2">
                             <Clock size={13} className="text-gold flex-shrink-0" />
-                            <span>{prog.start_time}{prog.end_time ? ` - ${prog.end_time}` : ''}</span>
+                            <span>{formatProgramTime(prog.start_time, prog.end_time)}</span>
                           </div>
                         )}
                       </div>
